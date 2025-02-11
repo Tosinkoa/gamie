@@ -31,11 +31,12 @@
     </div>
     <form on:submit|preventDefault={handleSubmit}>
       <div class="mb-4">
-        <label class="block text-gray-300 mb-1 text-sm sm:text-base" for="name">Name</label>
+        <label class="block text-gray-300 mb-1 text-sm sm:text-base" for="name">Username</label
+        >
         <input
-          id="name"
+          id="username"
           type="text"
-          placeholder="Your name"
+          placeholder="Your username"
           class="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
           required
         />
@@ -58,6 +59,18 @@
           id="password"
           type="password"
           placeholder="Your password"
+          class="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+          required
+        />
+      </div>
+      <div class="mb-6">
+        <label class="block text-gray-300 mb-1 text-sm sm:text-base" for="confirmPassword"
+          >Confirm Password</label
+        >
+        <input
+          id="confirmPassword"
+          type="password"
+          placeholder="Confirm your password"
           class="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
           required
         />

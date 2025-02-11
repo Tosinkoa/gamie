@@ -2,16 +2,22 @@ FROM rust:1.81
 
 WORKDIR /app
 
-# Copy Cargo.toml (skip Cargo.lock as it may not exist)
-COPY Cargo.toml ./
-
 # Install cargo-watch for live reloading
 RUN cargo install cargo-watch
+
+# Create a new empty project
+RUN cargo init
+
+# Copy only Cargo.toml first
+COPY Cargo.toml ./
+
+# Build dependencies only
+RUN cargo build --release || true
 
 # Copy the rest of the source code
 COPY . .
 
-# Build once to cache dependencies
+# Build the project
 RUN cargo build
 
 # Start the server with live reload
