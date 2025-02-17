@@ -2,7 +2,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { userStore, isAuthenticated } from "$lib/stores/user";
+  import { userStore } from "$lib/stores/user";
   import { authService } from "$lib/services/auth";
 
   export let redirectTo = "/login";
@@ -12,18 +12,9 @@
     try {
       await authService.checkAuth();
     } catch (error) {
-      if (error instanceof Error && error.message === "Token refresh failed") {
-        console.error("Token refresh failed:", error);
-        goto(redirectTo);
-      } else {
-        // Try to refresh the token
-        try {
-          await authService.refreshToken();
-        } catch (refreshError) {
-          console.error("Authentication failed after token refresh:", refreshError);
-          goto(redirectTo);
-        }
-      }
+      console.error("Authentication check failed:", error);
+      userStore.logout();
+      goto(redirectTo);
     }
   }
 
@@ -31,16 +22,13 @@
     try {
       isLoading = true;
       await checkAuthentication();
-    } catch (error) {
-      console.error("Authentication check failed:", error);
-      goto(redirectTo);
     } finally {
       isLoading = false;
     }
   });
 
+  // Immediately redirect if no user is present
   $: if (!isLoading && !$userStore.user) {
-    console.log("No user found, redirecting to:", redirectTo);
     goto(redirectTo);
   }
 </script>
@@ -52,7 +40,7 @@
         class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"
       ></div>
     </div>
-  {:else if $isAuthenticated}
+  {:else if $userStore.user}
     <slot />
   {/if}
 </div>

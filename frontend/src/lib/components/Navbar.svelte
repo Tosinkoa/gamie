@@ -39,9 +39,14 @@
   async function handleLogout() {
     try {
       await authService.logout();
-      goto("/");
+      closeProfile();
+      closeMenu();
+      goto("/login");
     } catch (error) {
       console.error("Logout failed:", error);
+      // Force logout even if the server request fails
+      userStore.logout();
+      goto("/login");
     }
   }
 </script>
@@ -85,7 +90,7 @@
                 {$userStore.user?.username}
               </span>
               <img
-                src={$userStore.user?.avatar}
+                src={$userStore.user?.profile_picture}
                 alt="Profile"
                 class="h-10 w-10 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-blue-500 transition-all duration-200"
               />
@@ -93,20 +98,28 @@
 
             {#if isProfileOpen}
               <div
-                class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5"
+                class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 z-50"
               >
                 <div class="py-1" role="menu">
-                  <a
-                    href="/profile"
-                    class="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                  <button
+                    type="button"
+                    on:click={async () => {
+                      closeProfile();
+                      await goto("/profile");
+                    }}
+                    class="flex items-center w-full px-4 py-2 cursor-pointer text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
                     role="menuitem"
                   >
                     <Icon icon="ph:user-circle" class="h-5 w-5 mr-2" />
                     Profile
-                  </a>
+                  </button>
                   <button
-                    on:click={handleLogout}
-                    class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                    type="button"
+                    on:click={async () => {
+                      closeProfile();
+                      await handleLogout();
+                    }}
+                    class="flex items-center w-full px-4 cursor-pointer py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
                     role="menuitem"
                   >
                     <Icon icon="ph:sign-out" class="h-5 w-5 mr-2" />
@@ -175,17 +188,16 @@
         </button>
 
         {#if isAuthenticated}
-          <a
-            href="/profile"
+          <button
+            on:click={toggleProfile}
             class="inline-flex items-center justify-center rounded-full hover:bg-gray-700 transition-all duration-200 group"
-            on:click|preventDefault={() => goto("/profile")}
           >
             <img
-              src={$userStore.user?.avatar}
+              src={$userStore.user?.profile_picture}
               alt="Profile"
               class="h-10 w-10 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-blue-500 transition-all duration-200"
             />
-          </a>
+          </button>
         {/if}
       </div>
     </div>
@@ -216,8 +228,11 @@
       {#if isAuthenticated}
         <a
           href="/profile"
+          on:click|preventDefault={() => {
+            closeMenu();
+            goto("/profile");
+          }}
           class="flex items-center px-3 py-3 rounded-md text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
-          on:click={closeMenu}
         >
           <Icon icon="ph:user-circle" class="h-6 w-6 mr-2" />
           <span>Profile</span>

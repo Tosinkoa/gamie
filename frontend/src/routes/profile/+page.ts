@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import { userStore, isAuthenticated } from '$lib/stores/user';
+import { userStore } from '$lib/stores/user';
 import { get } from 'svelte/store';
 
 export const load: PageLoad = async () => {
@@ -10,8 +10,8 @@ export const load: PageLoad = async () => {
         return {};
     }
 
-    const authenticated = get(isAuthenticated);
-    if (!authenticated) {
+    const user = get(userStore).user;
+    if (!user) {
         throw redirect(302, '/login');
     }
 

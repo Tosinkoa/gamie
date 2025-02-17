@@ -398,6 +398,44 @@ pub async fn refresh_token(
         })))
 }
 
+pub async fn logout() -> HttpResponse {
+    // Get environment
+    let is_prod =
+        std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()) == "production";
+
+    // Create empty cookies with same settings to clear the tokens
+    let access_cookie = Cookie::build("access_token", "")
+        .path("/")
+        .secure(is_prod)
+        .http_only(true)
+        .same_site(if is_prod {
+            actix_web::cookie::SameSite::Strict
+        } else {
+            actix_web::cookie::SameSite::Lax
+        })
+        .max_age(actix_web::cookie::time::Duration::ZERO)
+        .finish();
+
+    let refresh_cookie = Cookie::build("refresh_token", "")
+        .path("/")
+        .secure(is_prod)
+        .http_only(true)
+        .same_site(if is_prod {
+            actix_web::cookie::SameSite::Strict
+        } else {
+            actix_web::cookie::SameSite::Lax
+        })
+        .max_age(actix_web::cookie::time::Duration::ZERO)
+        .finish();
+
+    HttpResponse::Ok()
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .json(json!({
+            "message": "Logged out successfully"
+        }))
+}
+
 fn generate_tokens(user_id: &str, config: &Config) -> Result<(String, String), AppError> {
     let access_exp = Utc::now()
         .checked_add_signed(Duration::minutes(15))
