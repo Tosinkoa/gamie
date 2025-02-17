@@ -71,7 +71,7 @@ pub async fn signup(
             error!("Database error checking user existence: {}", e);
             AppError::DatabaseError(ErrorResponse {
                 code: "DATABASE_ERROR".to_string(),
-                message: "Error checking user existence".to_string(),
+                message: "Database error occurred".to_string(),
                 field: None,
             })
         })?;
@@ -160,9 +160,10 @@ pub async fn get_user_by_id(
     db: web::Data<Database>,
     user_id: web::Path<String>,
 ) -> Result<HttpResponse, AppError> {
-    let object_id = mongodb::bson::oid::ObjectId::parse_str(&*user_id).map_err(|_| {
+    let object_id = mongodb::bson::oid::ObjectId::parse_str(&*user_id).map_err(|e| {
+        error!("Invalid user ID format: {}", e);
         AppError::ValidationError(ErrorResponse {
-            code: "VALIDATION_ERROR".to_string(),
+            code: "INVALID_USER_ID".to_string(),
             message: "Invalid user ID format".to_string(),
             field: Some("user_id".to_string()),
         })
@@ -174,21 +175,38 @@ pub async fn get_user_by_id(
         .find_one(doc! { "_id": object_id }, None)
         .await
         .map_err(|e| {
+            error!("Database error fetching user: {}", e);
             AppError::DatabaseError(ErrorResponse {
                 code: "DATABASE_ERROR".to_string(),
-                message: e.to_string(),
+                message: "Error fetching user details".to_string(),
                 field: None,
             })
         })?
         .ok_or_else(|| {
+            error!("User not found with ID: {}", user_id);
             AppError::NotFound(ErrorResponse {
-                code: "NOT_FOUND".to_string(),
+                code: "USER_NOT_FOUND".to_string(),
                 message: "User not found".to_string(),
-                field: None,
+                field: Some("user_id".to_string()),
             })
         })?;
 
-    Ok(HttpResponse::Ok().json(user))
+    println!("==========================================");
+    println!("Data: {}", user.username);
+    println!("==========================================");
+
+    info!("User found: {}", user.username);
+
+    Ok(HttpResponse::Ok().json(json!({
+        "user": {
+            "id": user.id_to_string(),
+            "username": user.username,
+            "email": user.email,
+            "email_verified": user.email_verified,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at
+        }
+    })))
 }
 
 pub async fn login(

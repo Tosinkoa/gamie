@@ -124,6 +124,10 @@ impl User {
             0
         }
     }
+
+    pub fn id_to_string(&self) -> Option<String> {
+        self.id.map(|id| id.to_hex())
+    }
 }
 
 impl Validate for CreateUserDto {

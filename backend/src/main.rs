@@ -7,12 +7,17 @@ mod models;
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::http::header::{AUTHORIZATION, CONTENT_TYPE};
-use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer};
+use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use dotenv::dotenv;
 use serde_json::json;
 use tracing::info;
 
-use crate::{auth::routes::auth_routes, config::Config, db::Database};
+use crate::{
+    auth::routes::auth_routes,
+    config::Config,
+    db::Database,
+    error::{AppError, ErrorResponse},
+};
 
 async fn index() -> HttpResponse {
     HttpResponse::Ok().json(json!({
@@ -21,9 +26,18 @@ async fn index() -> HttpResponse {
         "endpoints": {
             "auth": {
                 "signup": "POST /auth/signup",
-                "login": "POST /auth/login"
+                "login": "POST /auth/login",
+                "user": "GET /auth/user/{id}"
             }
         }
+    }))
+}
+
+async fn not_found() -> Result<HttpResponse, AppError> {
+    Err(AppError::NotFound(ErrorResponse {
+        code: "NOT_FOUND".to_string(),
+        message: "The requested resource was not found".to_string(),
+        field: None,
     }))
 }
 
@@ -82,6 +96,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(db.clone()))
             .service(web::resource("/").to(index))
             .configure(auth_routes)
+            .default_service(web::route().to(not_found))
     })
     .bind((config.host, config.port))?
     .run()

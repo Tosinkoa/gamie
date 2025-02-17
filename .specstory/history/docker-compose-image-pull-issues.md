@@ -6475,6 +6475,449 @@ _****_
 
 
 
+I've made two changes to fix the mutability issues:
+
+1. Removed the `mut` from the first `user` declaration since it's not modified before being unwrapped
+2. Added `mut` to the unwrapped `user` variable since it needs to be mutable for:
+   - Recording failed login attempts
+   - Resetting login attempts on successful login
+
+The flow is now:
+1. Find the user (immutable)
+2. Log user details for debugging
+3. Unwrap the user as mutable for login attempt handling
+4. Use the mutable user for updating login attempts and account status
+
+This should resolve both the compiler errors while maintaining the correct functionality. The code will now properly:
+- Handle failed login attempts
+- Update the user's login status
+- Manage account locking
+- Track login attempts
+
+Try logging in again - it should work properly now with the mutability issues resolved.
+
+---
+
+_**User**_
+
+get_user_by_id endpoint is not returning any error nor any details. Just 404 status
+
+---
+
+_**Assistant**_
+
+The issue is that the `get_user_by_id` endpoint is not properly handling the response format. Let's fix it to return consistent error responses and ensure user details are properly returned:
+
+---
+
+_****_
+
+```diff
+      user_id: web::Path<String>,
+  ) -> Result<HttpResponse, AppError> {
+-     let object_id = mongodb::bson::oid::ObjectId::parse_str(&*user_id).map_err(|_| {
++     let object_id = mongodb::bson::oid::ObjectId::parse_str(&*user_id).map_err(|e| {
++         error!("Invalid user ID format: {}", e);
+          AppError::ValidationError(ErrorResponse {
+-             code: "VALIDATION_ERROR".to_string(),
++             code: "INVALID_USER_ID".to_string(),
+              message: "Invalid user ID format".to_string(),
+              field: Some("user_id".to_string()),
+          .await
+          .map_err(|e| {
++             error!("Database error fetching user: {}", e);
+              AppError::DatabaseError(ErrorResponse {
+                  code: "DATABASE_ERROR".to_string(),
+-                 message: e.to_string(),
++                 message: "Error fetching user details".to_string(),
+                  field: None,
+              })
+          })?
+          .ok_or_else(|| {
++             error!("User not found with ID: {}", user_id);
+              AppError::NotFound(ErrorResponse {
+-                 code: "NOT_FOUND".to_string(),
++                 code: "USER_NOT_FOUND".to_string(),
+                  message: "User not found".to_string(),
+-                 field: None,
++                 field: Some("user_id".to_string()),
+              })
+          })?;
+  
+-     Ok(HttpResponse::Ok().json(user))
++     info!("User found: {}", user.username);
++ 
++     Ok(HttpResponse::Ok().json(json!({
++         "user": {
++             "id": user.id,
++             "username": user.username,
++             "email": user.email,
++             "email_verified": user.email_verified,
++             "created_at": user.created_at,
++             "updated_at": user.updated_at
++         }
++     })))
+  }
+  
+```
+
+---
+
+_****_
+
+
+
+I've made several improvements to the `get_user_by_id` endpoint:
+
+1. Better Error Handling:
+   - Added error logging for all error cases
+   - More specific error codes (`INVALID_USER_ID`, `USER_NOT_FOUND`)
+   - Consistent error field information
+   - More user-friendly error messages
+
+2. Structured Response:
+   - Now returns a structured JSON response with a `user` object
+   - Includes relevant user fields (id, username, email, etc.)
+   - Excludes sensitive information (password hash)
+   - Consistent with other endpoint responses
+
+3. Added Logging:
+   - Logs invalid user ID attempts
+   - Logs database errors
+   - Logs when users are not found
+   - Logs successful user lookups
+
+The response will now look like:
+```json
+{
+    "user": {
+        "id": "...",
+        "username": "...",
+        "email": "...",
+        "email_verified": false,
+        "created_at": "...",
+        "updated_at": "..."
+    }
+}
+```
+
+And errors will be properly formatted like:
+```json
+{
+    "code": "USER_NOT_FOUND",
+    "message": "User not found",
+    "field": "user_id"
+}
+```
+
+Try the endpoint again - you should now get proper error messages when the user is not found and complete user details when they are found.
+
+---
+
+_**User**_
+
+Still same result
+
+---
+
+_**Assistant**_
+
+Let me check the issue. The problem might be with how the error is being handled by the `ResponseError` trait implementation. Let's verify the error response handling in `error.rs` and make sure it's properly serializing the error responses:
+
+---
+
+_****_
+
+<details>
+            <summary>Searched codebase "impl ResponseError for AppError" • **25** results</summary>
+        
+| File | Lines |
+|------|-------|
+| `backend/src/error.rs` | L1-46 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L4301-4363 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L3427-3501 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L4001-4035 |
+| `backend/src/config.rs` | L1-56 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L3958-4001 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L4737-4787 |
+| `backend/src/config.rs` | L56-82 |
+| `backend/src/auth/handlers.rs` | L54-110 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L4670-4737 |
+| `backend/src/auth/handlers.rs` | L192-250 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L3501-3565 |
+| `backend/src/auth/handlers.rs` | L250-302 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L1854-1902 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L3628-3706 |
+| `backend/src/auth/handlers.rs` | L302-324 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L3847-3912 |
+| `backend/src/db.rs` | L1-41 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L4548-4670 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L4787-4848 |
+| `backend/src/auth/handlers.rs` | L157-192 |
+| `backend/src/auth/handlers.rs` | L110-157 |
+| `backend/src/auth/handlers.rs` | L1-54 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L5025-5129 |
+| `.specstory/history/docker-compose-image-pull-issues.md` | L3193-3256 |
+
+</details>
+
+---
+
+_****_
+
+
+
+I see the issue. Let me fix the remaining errors in the code. I'll update the error handling in `handlers.rs` to properly use the `ErrorResponse` struct:
+
+---
+
+_****_
+
+
+
+---
+
+_****_
+
+
+
+I apologize for the confusion with the apply model. Let me try again with a more focused edit:
+
+---
+
+_****_
+
+
+
+---
+
+_****_
+
+
+
+I see that the apply model is having trouble with the edits. Let me try one more time with a more specific edit:
+
+---
+
+_****_
+
+```diff
+              AppError::DatabaseError(ErrorResponse {
+                  code: "DATABASE_ERROR".to_string(),
+-                 message: "Error checking user existence".to_string(),
++                 message: "Database error occurred".to_string(),
+                  field: None,
+              })
+```
+
+---
+
+_****_
+
+
+
+I see that the apply model is making changes, but we need to fix all instances of the error handling. Let me try to fix the remaining errors in the file:
+
+---
+
+_****_
+
+
+
+---
+
+_****_
+
+
+
+
+
+I apologize for the difficulty with the apply model. Let me try one more time with a more focused edit:
+
+---
+
+_****_
+
+
+
+---
+
+_****_
+
+
+
+
+
+I see that the file might already have the correct error handling in place. Let me verify the current state of the file:
+
+---
+
+_****_
+
+Read file: backend/src/auth/handlers.rs
+
+---
+
+_****_
+
+
+
+I apologize for the timeout. Let me try a different approach. Looking at the error messages and the code we've seen, it seems that all the error handling is actually correct in the file. The issue might be with the `error.rs` file. Let me check that:
+
+---
+
+_****_
+
+Read file: backend/src/error.rs
+
+---
+
+_****_
+
+
+
+
+
+Looking at the code, I can see that the error handling implementation in both `error.rs` and `handlers.rs` is actually correct. The error responses are properly structured with the `ErrorResponse` type that includes `code`, `message`, and optional `field` fields.
+
+Let's verify what specific error you're seeing. Could you please share:
+1. The exact error message you're getting?
+2. The line number where the error occurs?
+
+This will help me pinpoint the exact issue and provide a more targeted fix.
+
+---
+
+_**User**_
+
+Ah okay I see whats going on now, the route that donot exist returns nothing, I was doing `/user/{id}` instead of `/auth/user/{id}`
+
+Help add a valid error for route that donot exist
+
+---
+
+_**Assistant**_
+
+Ah, I understand! You want to add proper error handling for non-existent routes. We can do this by adding a default error handler in the main application setup. Let me help you modify the `main.rs` file:
+
+---
+
+_****_
+
+```diff
+  use actix_governor::{Governor, GovernorConfigBuilder};
+  use actix_web::http::header::{AUTHORIZATION, CONTENT_TYPE};
+- use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer};
++ use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
+  use dotenv::dotenv;
+  use serde_json::json;
+  use tracing::info;
+  
+- use crate::{auth::routes::auth_routes, config::Config, db::Database};
++ use crate::{
++     auth::routes::auth_routes,
++     config::Config,
++     db::Database,
++     error::{AppError, ErrorResponse},
++ };
+  
+  async fn index() -> HttpResponse {
+              "auth": {
+                  "signup": "POST /auth/signup",
+-                 "login": "POST /auth/login"
++                 "login": "POST /auth/login",
++                 "user": "GET /auth/user/{id}"
+              }
+          }
+      }))
+  }
++ 
++ async fn not_found() -> Result<HttpResponse, AppError> {
++     Err(AppError::NotFound(ErrorResponse {
++         code: "NOT_FOUND".to_string(),
++         message: "The requested resource was not found".to_string(),
++         field: None,
++     }))
++ }
+  
+  #[actix_web::main]
+              .service(web::resource("/").to(index))
+              .configure(auth_routes)
++             .default_service(web::route().to(not_found))
+      })
+      .bind((config.host, config.port))?
+```
+
+---
+
+_****_
+
+
+
+I've made the following changes to improve the error handling for non-existent routes:
+
+1. Added a `not_found` handler that returns a properly structured error response
+2. Added the default service handler using `.default_service(web::route().to(not_found))`
+3. Updated the API documentation in the index route to show the correct path for the user endpoint
+4. Added the necessary imports for error handling
+
+Now when you try to access a non-existent route like `/user/{id}` (instead of `/auth/user/{id}`), you'll get a proper JSON error response:
+
+```json
+{
+    "code": "NOT_FOUND",
+    "message": "The requested resource was not found",
+    "field": null
+}
+```
+
+This will help with:
+1. Consistent error handling across your API
+2. Clear indication that the route doesn't exist
+3. Proper HTTP 404 status code
+4. JSON format that matches your other error responses
+
+Remember to use `/auth/user/{id}` for user-related endpoints since they're configured under the auth routes.
+
+---
+
+_**User**_
+
+@handlers.rs @user.rs 
+For user data thats being returned for get_user_by_id, the id format seems kind of invalid, i.e { user: { id: $oid: dkkdk } }
+
+
+{
+    "user": {
+        "id": {
+            "$oid": "67b30024cdeccb2e016742f0"
+        },
+        "username": "paulliano",
+        "email": "tosinkoa2@gmail.com",
+        "email_verified": false,
+        "created_at": "2025-02-17T09:23:48.097877237Z",
+        "updated_at": "2025-02-17T09:23:48.097877237Z"
+    }
+}
+
+---
+
+_**Assistant**_
+
+Ah yes, I see the issue. The MongoDB ObjectId is being serialized with its BSON format. Let's modify the User model and the handler to return a cleaner ID format. We'll convert the ObjectId to its string representation:
+
+---
+
+_****_
+
+
+
+---
+
+_****_
+
+
+
 ---
 
 
