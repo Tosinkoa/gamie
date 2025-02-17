@@ -59,7 +59,7 @@ impl User {
             password_hash,
             email_verified: false,
             profile_picture: Some(format!(
-                "https://api.dicebear.com/7.x/avataaars/svg?seed={}",
+                "https://api.dicebear.com/7.x/thumbs/svg?seed={}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,b6e3f4,c0aede&rotate=0",
                 username
             )),
             failed_login_attempts: 0,

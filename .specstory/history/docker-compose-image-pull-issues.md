@@ -8400,7 +8400,110 @@ I've made the following changes:
    - Login response
    - Get current user response
 
-The profile picture is generated using DiceBear's avataaars API, which
+The profile picture is generated using DiceBear's avataaars API, which creates unique avatars based on the username. Users will get a default avatar when they sign up, and you can add functionality later to allow them to update their profile picture.
+
+Would you like me to add an endpoint for updating the profile picture as well?
+
+---
+
+_**User**_
+
+For the dicebar, is it possible we add query to give us profile that looks more neutral in gender? I mean while siging up
+
+---
+
+_**Assistant**_
+
+Yes, we can modify the DiceBear API URL to include additional parameters that make the avatar more neutral. Let's update the User model:
+
+---
+
+_****_
+
+```diff
+              email_verified: false,
+              profile_picture: Some(format!(
+-                 "https://api.dicebear.com/7.x/avataaars/svg?seed={}",
++                 "https://api.dicebear.com/7.x/avataaars/svg?seed={}&mouth[]=smile&mouth[]=default&eyes[]=default&eyes[]=happy&eyebrows[]=default&top[]=shortHair&hairColor[]=auburn&hairColor[]=black&hairColor[]=brown&backgroundColor[]=b6e3f4",
+                  username
+              )),
+```
+
+---
+
+_****_
+
+
+
+I've updated the DiceBear URL with the following neutral parameters:
+1. `mouth[]=smile&mouth[]=default` - neutral smile expressions
+2. `eyes[]=default&eyes[]=happy` - neutral eye styles
+3. `eyebrows[]=default` - neutral eyebrow style
+4. `top[]=shortHair` - neutral short hairstyle
+5. `hairColor[]=auburn&hairColor[]=black&hairColor[]=brown` - natural hair colors
+6. `backgroundColor[]=b6e3f4` - light blue background
+
+This will generate avatars that:
+- Have a more neutral appearance
+- Use natural hair colors
+- Have consistent, friendly expressions
+- Use a pleasant background color
+
+The avatar will still be unique for each user (based on their username as the seed) but will maintain a more neutral style. Would you like me to adjust any of these parameters further?
+
+---
+
+_**User**_
+
+That didnot work, it returns 404
+
+---
+
+_**Assistant**_
+
+Let me fix the DiceBear URL. The array syntax was incorrect. Here's the corrected version:
+
+---
+
+_****_
+
+```diff
+              email_verified: false,
+              profile_picture: Some(format!(
+-                 "https://api.dicebear.com/7.x/avataaars/svg?seed={}&mouth[]=smile&mouth[]=default&eyes[]=default&eyes[]=happy&eyebrows[]=default&top[]=shortHair&hairColor[]=auburn&hairColor[]=black&hairColor[]=brown&backgroundColor[]=b6e3f4",
++                 "https://api.dicebear.com/7.x/avataaars/svg?seed={}&mouth=smile,default&eyes=default,happy&eyebrows=default&top=shortHair&hairColor=auburn,black,brown&backgroundColor=b6e3f4",
+                  username
+              )),
+```
+
+---
+
+_****_
+
+
+
+I've fixed the URL by:
+1. Removing the `[]` syntax
+2. Using commas to separate multiple values
+3. Using single parameter names for each option
+
+The URL should now work correctly and generate neutral avatars. Try creating a new user and you should see the avatar generated properly. Let me know if you'd like to adjust any of the avatar parameters!
+
+---
+
+_**User**_
+
+	
+statusCode	400
+code	"FST_ERR_VALIDATION"
+error	"Bad Request"
+message	'querystring/hairColor/0 must match pattern "^(transparent|[a-fA-F0-9]{6})$"'
+
+---
+
+_**Assistant**_
+
+
 
 ---
 
