@@ -3,10 +3,10 @@ mod config;
 mod db;
 mod error;
 mod models;
+mod user;
 
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
-use actix_web::http::header::{AUTHORIZATION, CONTENT_TYPE};
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use dotenv::dotenv;
 use serde_json::json;
@@ -17,6 +17,7 @@ use crate::{
     config::Config,
     db::Database,
     error::{AppError, ErrorResponse},
+    user::routes::user_routes,
 };
 
 async fn index() -> HttpResponse {
@@ -76,8 +77,8 @@ async fn main() -> std::io::Result<()> {
                 .allowed_origin("http://localhost:5173")
                 .allowed_origin("http://127.0.0.1:5173")
                 .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-                .allowed_headers(vec![CONTENT_TYPE, AUTHORIZATION])
-                .expose_headers(vec![CONTENT_TYPE, AUTHORIZATION])
+                .allowed_headers(vec!["Content-Type", "Authorization", "Cookie"])
+                .expose_headers(vec!["Set-Cookie"])
                 .supports_credentials()
                 .max_age(3600)
         } else {
@@ -85,7 +86,8 @@ async fn main() -> std::io::Result<()> {
             Cors::default()
                 .allowed_origin(&config_clone.frontend_url)
                 .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-                .allowed_headers(vec![CONTENT_TYPE, AUTHORIZATION])
+                .allowed_headers(vec!["Content-Type", "Authorization", "Cookie"])
+                .expose_headers(vec!["Set-Cookie"])
                 .supports_credentials()
                 .max_age(3600)
         };
@@ -98,6 +100,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(config_clone.clone()))
             .service(web::resource("/").to(index))
             .configure(auth_routes)
+            .configure(user_routes)
             .default_service(web::route().to(not_found))
     })
     .bind((config.host, config.port))?

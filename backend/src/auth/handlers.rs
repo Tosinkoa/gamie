@@ -5,7 +5,7 @@ use argon2::{
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use mongodb::bson::{doc, oid::ObjectId};
+use mongodb::bson::doc;
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info};
@@ -161,114 +161,6 @@ pub async fn signup(
     })))
 }
 
-pub async fn get_user_by_id(
-    db: web::Data<Database>,
-    user_id: web::Path<String>,
-) -> Result<HttpResponse, AppError> {
-    let object_id = mongodb::bson::oid::ObjectId::parse_str(&*user_id).map_err(|e| {
-        error!("Invalid user ID format: {}", e);
-        AppError::ValidationError(ErrorResponse {
-            code: "INVALID_USER_ID".to_string(),
-            message: "Invalid user ID format".to_string(),
-            field: Some("user_id".to_string()),
-        })
-    })?;
-
-    let users_collection = db.get_users_collection();
-
-    let user = users_collection
-        .find_one(doc! { "_id": object_id }, None)
-        .await
-        .map_err(|e| {
-            error!("Database error fetching user: {}", e);
-            AppError::DatabaseError(ErrorResponse {
-                code: "DATABASE_ERROR".to_string(),
-                message: "Error fetching user details".to_string(),
-                field: None,
-            })
-        })?
-        .ok_or_else(|| {
-            error!("User not found with ID: {}", user_id);
-            AppError::NotFound(ErrorResponse {
-                code: "USER_NOT_FOUND".to_string(),
-                message: "User not found".to_string(),
-                field: Some("user_id".to_string()),
-            })
-        })?;
-
-    println!("==========================================");
-    println!("Data: {}", user.username);
-    println!("==========================================");
-
-    info!("User found: {}", user.username);
-
-    Ok(HttpResponse::Ok().json(json!({
-        "user": {
-            "id": user.id_to_string(),
-            "username": user.username,
-            "email": user.email,
-            "profile_picture": user.profile_picture,
-            "email_verified": user.email_verified,
-            "created_at": user.created_at,
-            "updated_at": user.updated_at
-        }
-    })))
-}
-
-fn generate_tokens(user_id: &str, config: &Config) -> Result<(String, String), AppError> {
-    let access_exp = Utc::now()
-        .checked_add_signed(Duration::minutes(15))
-        .expect("Valid timestamp")
-        .timestamp() as usize;
-
-    let refresh_exp = Utc::now()
-        .checked_add_signed(Duration::days(7))
-        .expect("Valid timestamp")
-        .timestamp() as usize;
-
-    let access_claims = Claims {
-        sub: user_id.to_string(),
-        exp: access_exp,
-        token_type: "access".to_string(),
-    };
-
-    let refresh_claims = Claims {
-        sub: user_id.to_string(),
-        exp: refresh_exp,
-        token_type: "refresh".to_string(),
-    };
-
-    let access_token = encode(
-        &Header::default(),
-        &access_claims,
-        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
-    )
-    .map_err(|e| {
-        error!("Token generation error: {}", e);
-        AppError::AuthError(ErrorResponse {
-            code: "TOKEN_GENERATION_ERROR".to_string(),
-            message: "Error generating access token".to_string(),
-            field: None,
-        })
-    })?;
-
-    let refresh_token = encode(
-        &Header::default(),
-        &refresh_claims,
-        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
-    )
-    .map_err(|e| {
-        error!("Token generation error: {}", e);
-        AppError::AuthError(ErrorResponse {
-            code: "TOKEN_GENERATION_ERROR".to_string(),
-            message: "Error generating refresh token".to_string(),
-            field: None,
-        })
-    })?;
-
-    Ok((access_token, refresh_token))
-}
-
 pub async fn login(
     db: web::Data<Database>,
     config: web::Data<Config>,
@@ -395,17 +287,38 @@ pub async fn login(
 
     let (access_token, refresh_token) = generate_tokens(&user.id_to_string().unwrap(), &config)?;
 
+    // Get environment
+    let is_prod =
+        std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()) == "production";
+
+    // Create cookies with proper settings
+    let access_cookie = Cookie::build("access_token", access_token)
+        .path("/")
+        .secure(is_prod)
+        .http_only(true)
+        .same_site(if is_prod {
+            actix_web::cookie::SameSite::Strict
+        } else {
+            actix_web::cookie::SameSite::Lax
+        })
+        .finish();
+
+    let refresh_cookie = Cookie::build("refresh_token", refresh_token)
+        .path("/")
+        .secure(is_prod)
+        .http_only(true)
+        .same_site(if is_prod {
+            actix_web::cookie::SameSite::Strict
+        } else {
+            actix_web::cookie::SameSite::Lax
+        })
+        .finish();
+
     Ok(HttpResponse::Ok()
-        .cookie(
-            Cookie::build("refresh_token", refresh_token.clone())
-                .path("/")
-                .secure(true)
-                .http_only(true)
-                .finish(),
-        )
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
         .json(json!({
             "message": "Login successful",
-            "access_token": access_token,
             "user": {
                 "id": user.id_to_string(),
                 "username": user.username,
@@ -413,45 +326,6 @@ pub async fn login(
                 "profile_picture": user.profile_picture
             }
         })))
-}
-
-pub async fn get_current_user(
-    db: web::Data<Database>,
-    user_id: web::ReqData<ObjectId>,
-) -> Result<HttpResponse, AppError> {
-    let users_collection = db.get_users_collection();
-
-    let user = users_collection
-        .find_one(doc! { "_id": *user_id }, None)
-        .await
-        .map_err(|e| {
-            error!("Database error fetching current user: {}", e);
-            AppError::DatabaseError(ErrorResponse {
-                code: "DATABASE_ERROR".to_string(),
-                message: "Error fetching user details".to_string(),
-                field: None,
-            })
-        })?
-        .ok_or_else(|| {
-            error!("User not found with ID: {:?}", user_id);
-            AppError::NotFound(ErrorResponse {
-                code: "USER_NOT_FOUND".to_string(),
-                message: "User not found".to_string(),
-                field: None,
-            })
-        })?;
-
-    Ok(HttpResponse::Ok().json(json!({
-        "user": {
-            "id": user.id_to_string(),
-            "username": user.username,
-            "email": user.email,
-            "profile_picture": user.profile_picture,
-            "email_verified": user.email_verified,
-            "created_at": user.created_at,
-            "updated_at": user.updated_at
-        }
-    })))
 }
 
 pub async fn refresh_token(
@@ -489,15 +363,91 @@ pub async fn refresh_token(
 
     let (access_token, refresh_token) = generate_tokens(&token_data.claims.sub, &config)?;
 
+    // Get environment
+    let is_prod =
+        std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()) == "production";
+
+    // Create cookies with proper settings
+    let access_cookie = Cookie::build("access_token", access_token)
+        .path("/")
+        .secure(is_prod)
+        .http_only(true)
+        .same_site(if is_prod {
+            actix_web::cookie::SameSite::Strict
+        } else {
+            actix_web::cookie::SameSite::Lax
+        })
+        .finish();
+
+    let refresh_cookie = Cookie::build("refresh_token", refresh_token)
+        .path("/")
+        .secure(is_prod)
+        .http_only(true)
+        .same_site(if is_prod {
+            actix_web::cookie::SameSite::Strict
+        } else {
+            actix_web::cookie::SameSite::Lax
+        })
+        .finish();
+
     Ok(HttpResponse::Ok()
-        .cookie(
-            Cookie::build("refresh_token", refresh_token)
-                .path("/")
-                .secure(true)
-                .http_only(true)
-                .finish(),
-        )
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
         .json(json!({
-            "access_token": access_token
+            "message": "Token refreshed"
         })))
+}
+
+fn generate_tokens(user_id: &str, config: &Config) -> Result<(String, String), AppError> {
+    let access_exp = Utc::now()
+        .checked_add_signed(Duration::minutes(15))
+        .expect("Valid timestamp")
+        .timestamp() as usize;
+
+    let refresh_exp = Utc::now()
+        .checked_add_signed(Duration::days(7))
+        .expect("Valid timestamp")
+        .timestamp() as usize;
+
+    let access_claims = Claims {
+        sub: user_id.to_string(),
+        exp: access_exp,
+        token_type: "access".to_string(),
+    };
+
+    let refresh_claims = Claims {
+        sub: user_id.to_string(),
+        exp: refresh_exp,
+        token_type: "refresh".to_string(),
+    };
+
+    let access_token = encode(
+        &Header::default(),
+        &access_claims,
+        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| {
+        error!("Token generation error: {}", e);
+        AppError::AuthError(ErrorResponse {
+            code: "TOKEN_GENERATION_ERROR".to_string(),
+            message: "Error generating access token".to_string(),
+            field: None,
+        })
+    })?;
+
+    let refresh_token = encode(
+        &Header::default(),
+        &refresh_claims,
+        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| {
+        error!("Token generation error: {}", e);
+        AppError::AuthError(ErrorResponse {
+            code: "TOKEN_GENERATION_ERROR".to_string(),
+            message: "Error generating refresh token".to_string(),
+            field: None,
+        })
+    })?;
+
+    Ok((access_token, refresh_token))
 }

@@ -1,7 +1,6 @@
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     error::ErrorUnauthorized,
-    http::header::AUTHORIZATION,
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
@@ -13,6 +12,7 @@ use std::{
     future::{ready, Ready},
     rc::Rc,
 };
+use tracing::{error, info};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -71,44 +71,107 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let auth_header = req.headers().get(AUTHORIZATION);
+        info!("=== Auth Middleware Start ===");
+        info!("Request path: {}", req.path());
+        info!("Request method: {}", req.method());
+
+        // Log all cookies
+        match req.cookies() {
+            Ok(cookies) => {
+                info!(
+                    "All cookies: {:?}",
+                    cookies.iter().map(|c| c.name()).collect::<Vec<_>>()
+                );
+            }
+            Err(e) => {
+                error!("Error getting cookies: {}", e);
+            }
+        }
+
+        let access_token = req.cookie("access_token");
+        info!("Access token present: {}", access_token.is_some());
+
         let jwt_secret = self.jwt_secret.clone();
 
-        if let Some(auth_header) = auth_header {
-            if let Ok(auth_str) = auth_header.to_str() {
-                if auth_str.starts_with("Bearer ") {
-                    let token = auth_str.trim_start_matches("Bearer ").trim();
-                    let validation = Validation::default();
+        if let Some(cookie) = access_token {
+            info!(
+                "Access token value (first 10 chars): {}",
+                cookie.value().chars().take(10).collect::<String>()
+            );
+            let token = cookie.value();
+            let mut validation = Validation::default();
+            validation.validate_exp = true;
 
-                    match decode::<Claims>(
-                        token,
-                        &DecodingKey::from_secret(jwt_secret.as_bytes()),
-                        &validation,
-                    ) {
-                        Ok(token_data) => {
-                            if let Ok(user_id) = ObjectId::parse_str(&token_data.claims.sub) {
-                                req.extensions_mut().insert(user_id);
-                                let fut = self.service.call(req);
-                                return Box::pin(async move {
-                                    let res = fut.await?;
-                                    Ok(res)
-                                });
-                            }
+            match decode::<Claims>(
+                token,
+                &DecodingKey::from_secret(jwt_secret.as_bytes()),
+                &validation,
+            ) {
+                Ok(token_data) => {
+                    info!("Token decoded successfully");
+                    info!("Token type: {}", token_data.claims.token_type);
+                    info!("User ID from token: {}", token_data.claims.sub);
+
+                    if token_data.claims.token_type != "access" {
+                        error!("Invalid token type: {}", token_data.claims.token_type);
+                        return Box::pin(async move {
+                            Err(ErrorUnauthorized(json!({
+                                "code": "INVALID_TOKEN_TYPE",
+                                "message": "Invalid token type",
+                                "field": None::<String>
+                            })))
+                        });
+                    }
+
+                    match ObjectId::parse_str(&token_data.claims.sub) {
+                        Ok(user_id) => {
+                            info!("User ID parsed successfully: {}", user_id);
+                            req.extensions_mut().insert(user_id);
+                            let fut = self.service.call(req);
+                            info!("=== Auth Middleware End - Success ===");
+                            return Box::pin(async move {
+                                let res = fut.await?;
+                                Ok(res)
+                            });
                         }
-                        Err(_) => {
+                        Err(e) => {
+                            error!("Failed to parse user ID: {}", e);
                             return Box::pin(async move {
                                 Err(ErrorUnauthorized(json!({
-                                    "code": "INVALID_TOKEN",
-                                    "message": "Invalid or expired token",
+                                    "code": "INVALID_USER_ID",
+                                    "message": "Invalid user ID in token",
                                     "field": None::<String>
                                 })))
                             });
                         }
                     }
                 }
+                Err(e) => {
+                    error!("Token validation failed: {}", e);
+                    return Box::pin(async move {
+                        Err(ErrorUnauthorized(json!({
+                            "code": "INVALID_TOKEN",
+                            "message": "Invalid or expired token",
+                            "field": None::<String>
+                        })))
+                    });
+                }
+            }
+        } else {
+            error!("No access_token cookie found");
+            if let Ok(cookies) = req.cookies() {
+                info!(
+                    "Available cookies: {}",
+                    cookies
+                        .iter()
+                        .map(|c| c.name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
         }
 
+        info!("=== Auth Middleware End - Unauthorized ===");
         Box::pin(async move {
             Err(ErrorUnauthorized(json!({
                 "code": "UNAUTHORIZED",
