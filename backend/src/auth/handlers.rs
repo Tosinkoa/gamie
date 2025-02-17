@@ -1,15 +1,19 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{cookie::Cookie, web, HttpRequest, HttpResponse};
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher,
 };
-use mongodb::bson::doc;
+use chrono::{Duration, Utc};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use mongodb::bson::{doc, oid::ObjectId};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info};
 use validator::Validate;
 
 use crate::{
+    auth::middleware::Claims,
+    config::Config,
     db::Database,
     error::{AppError, ErrorResponse},
     models::user::{CreateUserDto, User},
@@ -151,7 +155,8 @@ pub async fn signup(
         "message": "User created successfully",
         "user": {
             "username": user.username,
-            "email": user.email
+            "email": user.email,
+            "profile_picture": user.profile_picture
         }
     })))
 }
@@ -202,6 +207,7 @@ pub async fn get_user_by_id(
             "id": user.id_to_string(),
             "username": user.username,
             "email": user.email,
+            "profile_picture": user.profile_picture,
             "email_verified": user.email_verified,
             "created_at": user.created_at,
             "updated_at": user.updated_at
@@ -209,8 +215,63 @@ pub async fn get_user_by_id(
     })))
 }
 
+fn generate_tokens(user_id: &str, config: &Config) -> Result<(String, String), AppError> {
+    let access_exp = Utc::now()
+        .checked_add_signed(Duration::minutes(15))
+        .expect("Valid timestamp")
+        .timestamp() as usize;
+
+    let refresh_exp = Utc::now()
+        .checked_add_signed(Duration::days(7))
+        .expect("Valid timestamp")
+        .timestamp() as usize;
+
+    let access_claims = Claims {
+        sub: user_id.to_string(),
+        exp: access_exp,
+        token_type: "access".to_string(),
+    };
+
+    let refresh_claims = Claims {
+        sub: user_id.to_string(),
+        exp: refresh_exp,
+        token_type: "refresh".to_string(),
+    };
+
+    let access_token = encode(
+        &Header::default(),
+        &access_claims,
+        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| {
+        error!("Token generation error: {}", e);
+        AppError::AuthError(ErrorResponse {
+            code: "TOKEN_GENERATION_ERROR".to_string(),
+            message: "Error generating access token".to_string(),
+            field: None,
+        })
+    })?;
+
+    let refresh_token = encode(
+        &Header::default(),
+        &refresh_claims,
+        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| {
+        error!("Token generation error: {}", e);
+        AppError::AuthError(ErrorResponse {
+            code: "TOKEN_GENERATION_ERROR".to_string(),
+            message: "Error generating refresh token".to_string(),
+            field: None,
+        })
+    })?;
+
+    Ok((access_token, refresh_token))
+}
+
 pub async fn login(
     db: web::Data<Database>,
+    config: web::Data<Config>,
     payload: web::Json<LoginDto>,
 ) -> Result<HttpResponse, AppError> {
     let users_collection = db.get_users_collection();
@@ -332,11 +393,111 @@ pub async fn login(
 
     info!("User logged in successfully: {}", user.username);
 
+    let (access_token, refresh_token) = generate_tokens(&user.id_to_string().unwrap(), &config)?;
+
+    Ok(HttpResponse::Ok()
+        .cookie(
+            Cookie::build("refresh_token", refresh_token.clone())
+                .path("/")
+                .secure(true)
+                .http_only(true)
+                .finish(),
+        )
+        .json(json!({
+            "message": "Login successful",
+            "access_token": access_token,
+            "user": {
+                "id": user.id_to_string(),
+                "username": user.username,
+                "email": user.email,
+                "profile_picture": user.profile_picture
+            }
+        })))
+}
+
+pub async fn get_current_user(
+    db: web::Data<Database>,
+    user_id: web::ReqData<ObjectId>,
+) -> Result<HttpResponse, AppError> {
+    let users_collection = db.get_users_collection();
+
+    let user = users_collection
+        .find_one(doc! { "_id": *user_id }, None)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching current user: {}", e);
+            AppError::DatabaseError(ErrorResponse {
+                code: "DATABASE_ERROR".to_string(),
+                message: "Error fetching user details".to_string(),
+                field: None,
+            })
+        })?
+        .ok_or_else(|| {
+            error!("User not found with ID: {:?}", user_id);
+            AppError::NotFound(ErrorResponse {
+                code: "USER_NOT_FOUND".to_string(),
+                message: "User not found".to_string(),
+                field: None,
+            })
+        })?;
+
     Ok(HttpResponse::Ok().json(json!({
-        "message": "Login successful",
         "user": {
+            "id": user.id_to_string(),
             "username": user.username,
             "email": user.email,
+            "profile_picture": user.profile_picture,
+            "email_verified": user.email_verified,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at
         }
     })))
+}
+
+pub async fn refresh_token(
+    req: HttpRequest,
+    config: web::Data<Config>,
+) -> Result<HttpResponse, AppError> {
+    let refresh_token = req.cookie("refresh_token").ok_or_else(|| {
+        AppError::AuthError(ErrorResponse {
+            code: "REFRESH_TOKEN_REQUIRED".to_string(),
+            message: "Refresh token is required".to_string(),
+            field: None,
+        })
+    })?;
+
+    let token_data = decode::<Claims>(
+        refresh_token.value(),
+        &DecodingKey::from_secret(config.jwt_secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map_err(|_| {
+        AppError::AuthError(ErrorResponse {
+            code: "INVALID_REFRESH_TOKEN".to_string(),
+            message: "Invalid or expired refresh token".to_string(),
+            field: None,
+        })
+    })?;
+
+    if token_data.claims.token_type != "refresh" {
+        return Err(AppError::AuthError(ErrorResponse {
+            code: "INVALID_TOKEN_TYPE".to_string(),
+            message: "Invalid token type".to_string(),
+            field: None,
+        }));
+    }
+
+    let (access_token, refresh_token) = generate_tokens(&token_data.claims.sub, &config)?;
+
+    Ok(HttpResponse::Ok()
+        .cookie(
+            Cookie::build("refresh_token", refresh_token)
+                .path("/")
+                .secure(true)
+                .http_only(true)
+                .finish(),
+        )
+        .json(json!({
+            "access_token": access_token
+        })))
 }

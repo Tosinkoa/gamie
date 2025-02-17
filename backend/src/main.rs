@@ -67,6 +67,7 @@ async fn main() -> std::io::Result<()> {
     let server_url = format!("http://{}:{}", config.host, config.port);
     info!("Starting server at {}", server_url);
 
+    let config_clone = config.clone();
     HttpServer::new(move || {
         // Choose allowed origins based on environment
         let env = std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string());
@@ -82,7 +83,7 @@ async fn main() -> std::io::Result<()> {
         } else {
             // Production: use your production frontend URL from your config
             Cors::default()
-                .allowed_origin(&config.frontend_url)
+                .allowed_origin(&config_clone.frontend_url)
                 .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
                 .allowed_headers(vec![CONTENT_TYPE, AUTHORIZATION])
                 .supports_credentials()
@@ -94,6 +95,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(Governor::new(&governor_conf))
             .app_data(web::Data::new(db.clone()))
+            .app_data(web::Data::new(config_clone.clone()))
             .service(web::resource("/").to(index))
             .configure(auth_routes)
             .default_service(web::route().to(not_found))

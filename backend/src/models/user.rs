@@ -16,6 +16,8 @@ pub struct User {
     #[serde(default)]
     pub email_verified: bool,
     #[serde(default)]
+    pub profile_picture: Option<String>,
+    #[serde(default)]
     pub failed_login_attempts: i32,
     #[serde(default)]
     pub last_login_attempt: Option<DateTime<Utc>>,
@@ -56,6 +58,10 @@ impl User {
             email: email.to_lowercase(),
             password_hash,
             email_verified: false,
+            profile_picture: Some(format!(
+                "https://api.dicebear.com/7.x/avataaars/svg?seed={}",
+                username
+            )),
             failed_login_attempts: 0,
             last_login_attempt: None,
             account_locked_until: None,

@@ -22,4 +22,5 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 lazy_static = "1.4"
 actix-governor = "0.4"
-sanitize_html = "0.7" 
+sanitize_html = "0.7"
+jsonwebtoken = "9.2.0" 
