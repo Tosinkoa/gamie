@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { page } from "$app/stores";
+  import { user } from "$lib/stores/user";
 
   let isOpen = false;
 
@@ -10,6 +11,7 @@
     { href: "/premium", label: "Premium", icon: "ph:crown" },
     { href: "/leaderboard", label: "Leaderboard", icon: "ph:trophy" },
     { href: "/tournaments", label: "Tournaments", icon: "ph:flag" },
+    { href: "/feedback", label: "Feedback", icon: "ph:megaphone-simple" },
   ];
 
   $: currentPath = $page.url.pathname;
@@ -54,15 +56,42 @@
       <div class="hidden lg:flex lg:items-center lg:space-x-4">
         <a
           href="/profile"
-          class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
+          class="flex items-center px-3 py-2 rounded-full hover:bg-gray-700 transition-all duration-200 group"
         >
-          <Icon icon="ph:user-circle" class="h-6 w-6 mr-1" />
-          <span>Profile</span>
+          {#if $user}
+            <img
+              src={$user.avatar}
+              alt="Profile"
+              class="h-10 w-10 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-blue-500 transition-all duration-200"
+            />
+            <span class="ml-2 text-sm font-medium text-gray-300 group-hover:text-white">
+              {$user.username}
+            </span>
+          {:else}
+            <div
+              class="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center group-hover:bg-gray-600 transition-all duration-200"
+            >
+              <Icon
+                icon="ph:user-circle"
+                class="h-8 w-8 text-gray-300 group-hover:text-white"
+              />
+            </div>
+          {/if}
         </a>
       </div>
 
       <!-- Menu button (below lg screens) -->
-      <div class="flex items-center lg:hidden">
+      <div class="flex items-center lg:hidden space-x-3">
+        <!-- Mobile Feedback Link -->
+        <a
+          href="/feedback"
+          class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none"
+        >
+          <Icon icon="ph:megaphone-simple" class="h-6 w-6" />
+          <span class="sr-only">Feedback</span>
+        </a>
+
+        <!-- Menu button (below lg screens) -->
         <button
           type="button"
           class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none"
@@ -115,5 +144,11 @@
 
 <!-- Backdrop for mobile menu -->
 {#if isOpen}
-  <div class="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40" on:click={closeMenu}></div>
+  <div
+    class="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+    on:click={closeMenu}
+    on:keydown={(e) => e.key === "Escape" && closeMenu()}
+    role="button"
+    tabindex="0"
+  ></div>
 {/if}

@@ -1,58 +1,46 @@
 use actix_web::{HttpResponse, ResponseError};
 use serde::Serialize;
-use thiserror::Error;
+use std::fmt;
 
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
-    
-    #[error("Database error: {0}")]
-    DatabaseError(#[from] mongodb::error::Error),
-    
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-    
-    #[error("Authentication error: {0}")]
-    AuthError(String),
-    
-    #[error("Not found: {0}")]
-    NotFound(String),
-    
-    #[error("Conflict: {0}")]
-    Conflict(String),
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse {
+    pub code: String,
+    pub message: String,
+    pub field: Option<String>,
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    message: String,
+#[derive(Debug)]
+pub enum AppError {
+    ValidationError(ErrorResponse),
+    DatabaseError(ErrorResponse),
+    AuthError(ErrorResponse),
+    Conflict(ErrorResponse),
+    NotFound(ErrorResponse),
+    ConfigError(ErrorResponse),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AppError::ValidationError(err) => write!(f, "Validation error: {}", err.message),
+            AppError::DatabaseError(err) => write!(f, "Database error: {}", err.message),
+            AppError::AuthError(err) => write!(f, "Authentication error: {}", err.message),
+            AppError::Conflict(err) => write!(f, "Conflict error: {}", err.message),
+            AppError::NotFound(err) => write!(f, "Not found: {}", err.message),
+            AppError::ConfigError(err) => write!(f, "Configuration error: {}", err.message),
+        }
+    }
 }
 
 impl ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
-        let error_response = ErrorResponse {
-            message: self.to_string(),
-        };
-        
         match self {
-            AppError::ConfigError(_) => {
-                HttpResponse::InternalServerError().json(error_response)
-            }
-            AppError::DatabaseError(_) => {
-                HttpResponse::InternalServerError().json(error_response)
-            }
-            AppError::ValidationError(_) => {
-                HttpResponse::BadRequest().json(error_response)
-            }
-            AppError::AuthError(_) => {
-                HttpResponse::Unauthorized().json(error_response)
-            }
-            AppError::NotFound(_) => {
-                HttpResponse::NotFound().json(error_response)
-            }
-            AppError::Conflict(_) => {
-                HttpResponse::Conflict().json(error_response)
-            }
+            AppError::ValidationError(err) => HttpResponse::BadRequest().json(err),
+            AppError::DatabaseError(err) => HttpResponse::InternalServerError().json(err),
+            AppError::AuthError(err) => HttpResponse::Unauthorized().json(err),
+            AppError::Conflict(err) => HttpResponse::Conflict().json(err),
+            AppError::NotFound(err) => HttpResponse::NotFound().json(err),
+            AppError::ConfigError(err) => HttpResponse::InternalServerError().json(err),
         }
     }
-} 
+}

@@ -10,6 +10,7 @@ export interface Room {
     };
     status: RoomStatus;
     creator: string;
+    avatars: string[];
 }
 
 export interface Game {
@@ -22,7 +23,5 @@ export interface Game {
 }
 
 export const gameTitles: Record<string, string> = {
-    tictactoe: "Tic Tac Toe",
-    chess: "Chess",
-    connect4: "Connect 4",
+    "number-chaos": "Number Chaos",
 }; 

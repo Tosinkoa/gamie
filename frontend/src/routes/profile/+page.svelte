@@ -12,6 +12,8 @@
     joinDate: "2023-09-15",
     status: "online",
     email: "progamer@example.com",
+    country: "US",
+    countryName: "United States",
     badges: [
       { icon: "ph:crown-simple", label: "Premium Member", color: "text-yellow-400" },
       { icon: "ph:trophy", label: "Tournament Winner", color: "text-blue-400" },
@@ -168,13 +170,13 @@
     <div class="relative bg-gray-900 rounded-2xl p-8 mb-8 overflow-hidden">
       <!-- Background Pattern -->
       <div class="absolute inset-0 opacity-10">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500" />
+        <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500"></div>
         {#each Array(50) as _, i}
           <div
             class="absolute w-8 h-8 border-2 border-white/20 rounded-full"
             style="left: {Math.random() * 100}%; top: {Math.random() *
               100}%; transform: scale({0.5 + Math.random()});"
-          />
+          ></div>
         {/each}
       </div>
 
@@ -187,13 +189,22 @@
           </div>
           <div
             class="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-green-500 ring-4 ring-gray-900"
-          />
+          ></div>
         </div>
 
         <!-- User Info -->
         <div class="flex-grow text-center md:text-left">
           <div class="flex flex-col md:flex-row items-center gap-4 mb-4">
             <h1 class="text-3xl font-bold text-white">{user.username}</h1>
+            <div class="flex items-center gap-2">
+              <img
+                src={`https://flagcdn.com/w20/${user.country.toLowerCase()}.png`}
+                alt={user.countryName}
+                class="w-5 h-4 rounded-sm shadow-sm"
+                title={user.countryName}
+              />
+              <span class="text-gray-400">{user.countryName}</span>
+            </div>
             <div class="flex flex-wrap justify-center gap-2">
               {#each user.badges as badge}
                 <div
@@ -218,7 +229,7 @@
               <div
                 class="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
                 style="width: {(user.xp / user.xpToNext) * 100}%"
-              />
+              ></div>
             </div>
           </div>
 
@@ -309,7 +320,7 @@
                   <div
                     class="h-full bg-gradient-to-r {achievement.color} transition-all duration-500"
                     style="width: {achievement.progress}%"
-                  />
+                  ></div>
                 </div>
                 <div class="text-right text-sm text-gray-400 mt-1">
                   {achievement.progress}%
@@ -341,7 +352,7 @@
               <div
                 class="h-full bg-gradient-to-r {achievement.color} transition-all duration-500"
                 style="width: {achievement.progress}%"
-              />
+              ></div>
             </div>
             <div class="flex justify-between mt-2">
               <span class="text-sm text-gray-400">Progress</span>
@@ -420,8 +431,11 @@
           <div class="space-y-4">
             <h3 class="text-lg font-semibold text-white">Profile Information</h3>
             <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">Username</label>
+              <label for="username" class="block text-sm font-medium text-gray-400 mb-2"
+                >Username</label
+              >
               <input
+                id="username"
                 type="text"
                 bind:value={username}
                 class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -442,7 +456,7 @@
           <div class="space-y-4 pt-4 border-t border-gray-800">
             <h3 class="text-lg font-semibold text-white">Email Settings</h3>
             <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">Current Email</label>
+              <div class="block text-sm font-medium text-gray-400 mb-2">Current Email</div>
               <div
                 class="text-gray-300 px-4 py-2 bg-gray-800 rounded-lg border border-gray-700"
               >
@@ -450,8 +464,11 @@
               </div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">New Email</label>
+              <label for="newEmail" class="block text-sm font-medium text-gray-400 mb-2"
+                >New Email</label
+              >
               <input
+                id="newEmail"
                 type="email"
                 placeholder="Enter new email address"
                 class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -473,10 +490,11 @@
             <h3 class="text-lg font-semibold text-white">Change Password</h3>
             {#if passwordStage === "old"}
               <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">
+                <label for="oldPassword" class="block text-sm font-medium text-gray-400 mb-2">
                   Current Password
                 </label>
                 <input
+                  id="oldPassword"
                   type="password"
                   bind:value={oldPassword}
                   class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -485,10 +503,14 @@
               </div>
             {:else if passwordStage === "token"}
               <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">
+                <label
+                  for="verificationToken"
+                  class="block text-sm font-medium text-gray-400 mb-2"
+                >
                   Verification Code
                 </label>
                 <input
+                  id="verificationToken"
                   type="text"
                   bind:value={verificationToken}
                   class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -498,10 +520,14 @@
             {:else}
               <div class="space-y-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-400 mb-2">
+                  <label
+                    for="newPassword"
+                    class="block text-sm font-medium text-gray-400 mb-2"
+                  >
                     New Password
                   </label>
                   <input
+                    id="newPassword"
                     type="password"
                     bind:value={newPassword}
                     class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -509,10 +535,14 @@
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-400 mb-2">
+                  <label
+                    for="confirmPassword"
+                    class="block text-sm font-medium text-gray-400 mb-2"
+                  >
                     Confirm New Password
                   </label>
                   <input
+                    id="confirmPassword"
                     type="password"
                     bind:value={confirmPassword}
                     class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -538,6 +568,19 @@
 </div>
 
 <style>
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  :global(.hover\:scale-102:hover) {
+    transform: scale(1.02);
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.5s ease-out forwards;
     opacity: 0;
@@ -552,18 +595,5 @@
       opacity: 1;
       transform: translateY(0);
     }
-  }
-
-  :global(.hover\:scale-102:hover) {
-    transform: scale(1.02);
-  }
-
-  /* Hide scrollbar but keep functionality */
-  .scrollbar-none {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
   }
 </style>

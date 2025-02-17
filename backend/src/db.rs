@@ -1,38 +1,41 @@
-use mongodb::{
-    bson::doc,
-    options::ClientOptions,
-    Client, Collection, Database as MongoDatabase,
-};
-use crate::{error::AppError, models::user::User};
+use crate::error::{AppError, ErrorResponse};
+use crate::models::user::User;
+use mongodb::{bson::doc, Client, Collection, Database as MongoDatabase};
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Database {
-    pub client: Client,
-    pub db: MongoDatabase,
+    db: MongoDatabase,
 }
 
 impl Database {
-    pub async fn connect(database_url: &str) -> Result<Self, AppError> {
-        let client_options = ClientOptions::parse(database_url)
-            .await
-            .map_err(AppError::DatabaseError)?;
-            
-        let client = Client::with_options(client_options)
-            .map_err(AppError::DatabaseError)?;
-            
+    pub async fn connect(uri: &str) -> Result<Self, AppError> {
+        let client = Client::with_uri_str(uri).await.map_err(|e| {
+            AppError::DatabaseError(ErrorResponse {
+                code: "DATABASE_CONNECTION_ERROR".to_string(),
+                message: format!("Failed to connect to database: {}", e),
+                field: None,
+            })
+        })?;
+
         let db = client.database("gamie");
-        
+
         // Ping the database to ensure connection is valid
         client
             .database("admin")
             .run_command(doc! {"ping": 1}, None)
             .await
-            .map_err(AppError::DatabaseError)?;
-            
-        Ok(Database { client, db })
+            .map_err(|e| {
+                AppError::DatabaseError(ErrorResponse {
+                    code: "DATABASE_CONNECTION_ERROR".to_string(),
+                    message: format!("Failed to ping database: {}", e),
+                    field: None,
+                })
+            })?;
+
+        Ok(Self { db })
     }
-    
+
     pub fn get_users_collection(&self) -> Collection<User> {
         self.db.collection("users")
     }
-} 
+}

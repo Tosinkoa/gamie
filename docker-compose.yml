@@ -7,12 +7,27 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - cargo_cache:/usr/local/cargo/registry
+      - target_cache:/app/target
+      - cargo_git_cache:/usr/local/cargo/git
     depends_on:
       - mongodb
       - redis
     dns:
+      - 1.1.1.1
       - 8.8.8.8
-      - 8.8.4.4
+    dns_search: []
+    dns_opt:
+      - timeout:5
+      - attempts:3
+    environment:
+      - RUST_BACKTRACE=1
+      - CARGO_TARGET_DIR=/app/target
+      - RUST_LOG=warn
+      - CARGO_INCREMENTAL=1
+      - CARGO_BUILD_JOBS=4
+      - CARGO_NET_GIT_FETCH_WITH_CLI=true
+      - CARGO_HTTP_MULTIPLEXING=false
 
   mongodb:
     image: mongo:latest
@@ -20,11 +35,20 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
 
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
 
 volumes:
-  mongodb_data: 
+  mongodb_data:
+  cargo_cache:
+  target_cache:
+  cargo_git_cache:

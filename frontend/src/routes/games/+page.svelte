@@ -5,27 +5,11 @@
 
   const games: Game[] = [
     {
-      id: "tictactoe",
-      name: "Tic Tac Toe",
-      description: "Classic game of X's and O's",
-      icon: "game-icons:tic-tac-toe",
-      players: "2 Players",
-      difficulty: "Easy",
-    },
-    {
-      id: "chess",
-      name: "Chess",
-      description: "Strategic board game of kings and queens",
-      icon: "game-icons:chess-knight",
-      players: "2 Players",
-      difficulty: "Hard",
-    },
-    {
-      id: "connect4",
-      name: "Connect 4",
-      description: "Connect four pieces in a row to win",
-      icon: "game-icons:connect",
-      players: "2 Players",
+      id: "number-chaos",
+      name: "Number Chaos",
+      description: "Race against time to arrange numbers in sequence",
+      icon: "ph:sort-ascending",
+      players: "2-4 Players",
       difficulty: "Medium",
     },
   ];
@@ -37,8 +21,7 @@
 
 <div class="min-h-screen bg-gradient-to-br from-gray-800 to-black px-4 py-8 sm:px-6 lg:px-8">
   <div class="max-w-7xl mx-auto">
-    <h1 class="text-3xl sm:text-4xl font-bold text-white mb-8 text-center">Available Games</h1>
-
+    <h1 class="text-3xl sm:text-4xl font-bold text-white text-center mb-8">Available Games</h1>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {#each games as game}
         <button
@@ -47,7 +30,9 @@
           on:click={() => handleGameClick(game.id)}
         >
           <div class="flex items-center justify-center mb-4">
-            <Icon icon={game.icon} class="w-16 h-16 text-blue-500" />
+            <div class="w-20 h-20 bg-blue-500/20 rounded-2xl flex items-center justify-center">
+              <Icon icon={game.icon} class="w-12 h-12 text-blue-400" />
+            </div>
           </div>
           <h2 class="text-xl font-semibold text-white mb-2 text-center">
             {game.name}

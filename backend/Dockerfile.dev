@@ -1,24 +1,33 @@
-FROM rust:1.81
+FROM rust:1.75-slim as builder
+
+# Install dependencies for building
+RUN apt-get update && \
+    apt-get install -y pkg-config libssl-dev git curl xz-utils
+
+# Download and extract cargo-watch
+RUN curl -L https://github.com/watchexec/cargo-watch/releases/download/v8.4.1/cargo-watch-v8.4.1-x86_64-unknown-linux-gnu.tar.xz -o cargo-watch.tar.xz && \
+    tar -xf cargo-watch.tar.xz && \
+    mv cargo-watch-v8.4.1-x86_64-unknown-linux-gnu/cargo-watch /usr/local/cargo/bin/ && \
+    rm -rf cargo-watch.tar.xz cargo-watch-v8.4.1-x86_64-unknown-linux-gnu
+
+FROM rust:1.75-slim
+
+# Copy cargo-watch from builder
+COPY --from=builder /usr/local/cargo/bin/cargo-watch /usr/local/cargo/bin/
 
 WORKDIR /app
 
-# Install cargo-watch for live reloading
-RUN cargo install cargo-watch
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y pkg-config libssl-dev git && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create a new empty project
-RUN cargo init
+# Create a dummy project and build dependencies
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build && \
+    rm -rf src
 
-# Copy only Cargo.toml first
-COPY Cargo.toml ./
-
-# Build dependencies only
-RUN cargo build --release || true
-
-# Copy the rest of the source code
-COPY . .
-
-# Build the project
-RUN cargo build
-
-# Start the server with live reload
-CMD ["cargo", "watch", "-x", "run"] 
+# The actual source code will be mounted at runtime
+CMD ["cargo", "watch", "-x", "check", "-x", "run", "-w", "src", "-w", "Cargo.toml", "--why"]
