@@ -58,12 +58,11 @@
       <div class="flex-shrink-0 flex items-center">
         <a href="/" class="flex items-center space-x-2">
           <Icon icon="ph:game-controller" class="h-8 w-8 text-blue-500" />
-          <span class="text-white text-xl font-bold">GameConnect</span>
         </a>
       </div>
 
       <!-- Desktop navigation (lg screens and up) -->
-      <div class="hidden lg:flex lg:items-center lg:space-x-4">
+      <div class="hidden lg:flex lg:items-center xl:space-x-4">
         {#each navItems as item}
           <a
             href={item.href}
@@ -148,7 +147,7 @@
             </a>
             <a
               href="/signup"
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors duration-200"
+              class="px-4 py-2 whitespace-nowrap text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors duration-200"
             >
               Sign Up
             </a>

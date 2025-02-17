@@ -11,15 +11,15 @@ export interface Room {
     status: RoomStatus;
     creator: string;
     avatars: string[];
+    difficulty: string;
 }
 
 export interface Game {
     id: string;
     name: string;
     description: string;
-    icon: string;
+    image: string;
     players: string;
-    difficulty: string;
 }
 
 export const gameTitles: Record<string, string> = {

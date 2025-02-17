@@ -40,7 +40,7 @@
 
 <RedirectGuard>
   <div
-    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-800 to-black px-4 sm:px-6 lg:px-8"
+    class="h-[calc(100dvh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-800 to-black px-4 sm:px-6 lg:px-8"
   >
     <div class="bg-gray-800 p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-md relative">
       <a href="/" class="absolute top-4 left-4 text-sm text-blue-400 hover:underline"

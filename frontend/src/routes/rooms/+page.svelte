@@ -12,6 +12,7 @@
       game: "number-chaos",
       players: { current: 1, max: 2 },
       status: "waiting",
+      difficulty: "Medium",
       creator: "Player1",
       avatars: [
         "https://api.dicebear.com/7.x/avataaars/svg?seed=User1",
@@ -25,6 +26,7 @@
       game: "number-chaos",
       players: { current: 2, max: 4 },
       status: "playing",
+      difficulty: "Medium",
       creator: "Player2",
       avatars: [
         "https://api.dicebear.com/7.x/avataaars/svg?seed=User4",
@@ -37,6 +39,7 @@
       game: "number-chaos",
       players: { current: 0, max: 4 },
       status: "waiting",
+      difficulty: "Easy",
       creator: "Player3",
       avatars: ["https://api.dicebear.com/7.x/avataaars/svg?seed=User6"],
     },
@@ -71,21 +74,25 @@
   }
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-gray-800 to-black px-4 py-8 sm:px-6 lg:px-8">
+<div
+  class="min-h-screen bg-gradient-to-br from-gray-800 to-black px-2 sm:px-4 lg:px-6 py-4 sm:py-6"
+>
   <div class="max-w-7xl mx-auto">
-    <div class="flex justify-between items-center mb-8">
-      <h1 class="text-3xl sm:text-4xl font-bold text-white">Number Chaos Rooms</h1>
+    <div
+      class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6"
+    >
+      <h1 class="text-2xl sm:text-3xl font-bold text-white">Number Chaos Rooms</h1>
       <button
         on:click={toggleCreateForm}
-        class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-300 flex items-center"
+        class="px-3 py-1.5 sm:px-4 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-300 flex items-center text-sm sm:text-base w-fit"
       >
-        <Icon icon="ph:plus-circle" class="w-5 h-5 mr-2" />
+        <Icon icon="ph:plus-circle" class="w-4 h-4 sm:w-5 sm:h-5 mr-1.5" />
         {showCreateForm ? "Cancel" : "Create Room"}
       </button>
     </div>
 
     {#if showCreateForm}
-      <div class="fixed inset-0 flex items-center justify-center z-50">
+      <div class="fixed inset-0 flex items-center justify-center z-50 px-4">
         <!-- Modal backdrop -->
         <div
           class="absolute inset-0 bg-black bg-opacity-50"
@@ -95,20 +102,20 @@
           tabindex="0"
         ></div>
         <!-- Modal content -->
-        <div class="bg-gray-900 rounded-xl p-6 relative z-10 max-w-xl min-w-[500px] mx-auto">
+        <div class="bg-gray-900 rounded-xl p-4 sm:p-6 relative z-10 w-full max-w-xl mx-auto">
           <!-- Close button -->
           <button
             on:click={toggleCreateForm}
             class="absolute top-2 right-2 text-white text-2xl focus:outline-none"
             >&times;</button
           >
-          <h2 class="text-xl font-semibold text-white mb-4">Create a New Room</h2>
+          <h2 class="text-lg sm:text-xl font-semibold text-white mb-4">Create a New Room</h2>
           <!-- Game select field -->
           <div class="mb-4">
-            <label class="block text-gray-300 mb-1">Select Game</label>
+            <label class="block text-gray-300 text-sm mb-1">Select Game</label>
             <select
               bind:value={selectedGame}
-              class="w-full p-2 bg-gray-800 border border-gray-700 rounded"
+              class="w-full p-2 text-sm bg-gray-800 border border-gray-700 rounded"
             >
               <option value="">-- Select a game --</option>
               <option value="number-chaos">Number Chaos</option>
@@ -118,29 +125,29 @@
           {#if selectedGame}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label class="block text-gray-300 mb-1">Order</label>
+                <label class="block text-gray-300 text-sm mb-1">Order</label>
                 <select
                   bind:value={order}
-                  class="w-full p-2 bg-gray-800 border border-gray-700 rounded"
+                  class="w-full p-2 text-sm bg-gray-800 border border-gray-700 rounded"
                 >
                   <option value="asc">Ascending</option>
                   <option value="desc">Descending</option>
                 </select>
               </div>
               <div>
-                <label class="block text-gray-300 mb-1">Time (seconds)</label>
+                <label class="block text-gray-300 text-sm mb-1">Time (seconds)</label>
                 <input
                   type="number"
                   bind:value={time}
                   min="10"
-                  class="w-full p-2 bg-gray-800 border border-gray-700 rounded"
+                  class="w-full p-2 text-sm bg-gray-800 border border-gray-700 rounded"
                 />
               </div>
               <div>
-                <label class="block text-gray-300 mb-1">Range</label>
+                <label class="block text-gray-300 text-sm mb-1">Range</label>
                 <select
                   bind:value={range}
-                  class="w-full p-2 bg-gray-800 border border-gray-700 rounded"
+                  class="w-full p-2 text-sm bg-gray-800 border border-gray-700 rounded"
                 >
                   <option value="1-100">1-100</option>
                   <option value="101-200">101-200</option>
@@ -148,20 +155,20 @@
                 </select>
               </div>
               <div>
-                <label class="block text-gray-300 mb-1">Number of Players</label>
+                <label class="block text-gray-300 text-sm mb-1">Number of Players</label>
                 <input
                   type="number"
                   bind:value={players}
                   min="2"
                   max="4"
-                  class="w-full p-2 bg-gray-800 border border-gray-700 rounded"
+                  class="w-full p-2 text-sm bg-gray-800 border border-gray-700 rounded"
                 />
               </div>
             </div>
           {/if}
           <button
             on:click={handleCreateRoom}
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition"
+            class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition text-sm"
           >
             Create Room
           </button>
@@ -169,17 +176,17 @@
       </div>
     {/if}
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
       {#each rooms as room}
         <RoomCard {room} />
       {/each}
     </div>
 
     {#if rooms.length === 0}
-      <div class="text-center text-gray-400 py-12">
-        <Icon icon="ph:numbers" class="w-16 h-16 mx-auto mb-4" />
-        <p class="text-xl">No rooms available</p>
-        <p class="mt-2">Be the first to create a room!</p>
+      <div class="text-center text-gray-400 py-8 sm:py-12">
+        <Icon icon="ph:numbers" class="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4" />
+        <p class="text-lg sm:text-xl">No rooms available</p>
+        <p class="mt-2 text-sm sm:text-base">Be the first to create a room!</p>
       </div>
     {/if}
   </div>
