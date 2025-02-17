@@ -51,7 +51,7 @@ impl User {
         let now = Utc::now();
         Self {
             id: None,
-            username,
+            username: username.to_lowercase(),
             email: email.to_lowercase(),
             password_hash,
             email_verified: false,

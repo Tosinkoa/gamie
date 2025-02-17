@@ -4,7 +4,6 @@ use argon2::{
     Argon2, PasswordHasher,
 };
 use mongodb::bson::doc;
-use regex;
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info};
@@ -26,7 +25,9 @@ pub async fn signup(
     db: web::Data<Database>,
     mut payload: web::Json<CreateUserDto>,
 ) -> Result<HttpResponse, AppError> {
-    // Sanitize input
+    // Sanitize input and convert to lowercase
+    payload.username = payload.username.to_lowercase();
+    payload.email = payload.email.to_lowercase();
     payload.sanitize();
 
     // Validate the request payload
@@ -50,16 +51,13 @@ pub async fn signup(
 
     let users_collection = db.get_users_collection();
 
-    // Check both username and email existence in a single query
+    // Check both username and email existence in a single query (case insensitive)
     let existing_user = users_collection
         .find_one(
             doc! {
                 "$or": [
                     {
-                        "username": {
-                            "$regex": format!("^{}$", regex::escape(&payload.username)),
-                            "$options": "i"
-                        }
+                        "username": payload.username.to_lowercase()
                     },
                     {
                         "email": payload.email.to_lowercase()
@@ -80,7 +78,8 @@ pub async fn signup(
 
     // Check which field caused the conflict
     if let Some(existing) = existing_user {
-        if existing.email.to_lowercase() == payload.email.to_lowercase() {
+        if existing.email == payload.email {
+            // Both are already lowercase
             return Err(AppError::Conflict(ErrorResponse {
                 code: "EMAIL_EXISTS".to_string(),
                 message: "Account already exists".to_string(),
@@ -182,8 +181,8 @@ pub async fn login(
 ) -> Result<HttpResponse, AppError> {
     let users_collection = db.get_users_collection();
 
-    // Trim whitespace from input
-    let username_or_email = payload.username_or_email.trim();
+    // Trim whitespace and convert to lowercase
+    let username_or_email = payload.username_or_email.trim().to_lowercase();
     let password = payload.password.trim();
 
     if username_or_email.is_empty() {
@@ -207,15 +206,8 @@ pub async fn login(
         .find_one(
             doc! {
                 "$or": [
-                    {
-                        "username": {
-                            "$regex": format!("^{}$", regex::escape(username_or_email)),
-                            "$options": "i"
-                        }
-                    },
-                    {
-                        "email": username_or_email.to_lowercase()
-                    }
+                    { "username": &username_or_email },
+                    { "email": &username_or_email }
                 ]
             },
             None,

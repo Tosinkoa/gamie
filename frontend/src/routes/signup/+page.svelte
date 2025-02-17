@@ -77,18 +77,21 @@
     fieldErrors = {};
     loading = true;
 
+    // Convert email to lowercase before sending
+    const formData = {
+      username: username,
+      email: email.toLowerCase(),
+      password,
+      password_verify: confirmPassword,
+    };
+
     try {
       const response = await fetch(`${env.PUBLIC_BACKEND_URL}/auth/signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-          password_verify: confirmPassword,
-        }),
+        body: JSON.stringify(formData),
         credentials: "include",
       });
 
@@ -192,6 +195,7 @@
           id="email"
           type="email"
           bind:value={email}
+          on:input={(e) => (email = e.currentTarget.value.toLowerCase())}
           placeholder="Your email"
           class="w-full px-3 sm:px-4 py-2 bg-gray-700 border {fieldErrors.email
             ? 'border-red-500'

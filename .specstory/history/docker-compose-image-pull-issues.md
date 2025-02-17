@@ -5293,6 +5293,381 @@ _**User**_
 
 _**Assistant**_
 
+These are just warnings, not errors. Let's clean them up:
+
+1. Remove unused imports in `db.rs`:
+
+---
+
+_****_
+
+```diff
+  use crate::error::{AppError, ErrorResponse};
+  use crate::models::user::User;
+- use mongodb::{bson::doc, options::ClientOptions, Client, Collection, Database as MongoDatabase};
++ use mongodb::{bson::doc, Client, Collection, Database as MongoDatabase};
+  
+  #[derive(Debug, Clone)]
+```
+
+---
+
+_****_
+
+
+
+2. Remove unused import in `error.rs`:
+
+---
+
+_****_
+
+```diff
+  use actix_web::{HttpResponse, ResponseError};
+- use mongodb::error::Error as MongoError;
+  use serde::Serialize;
+  use std::fmt;
+```
+
+---
+
+_****_
+
+
+
+
+
+3. For the `jwt_secret` warning, this is just indicating that we're not using the field yet. This is fine as we'll be using it later for JWT authentication. If you want to silence the warning, you can add an attribute to the field:
+
+---
+
+_****_
+
+```diff
+      /// Frontend URL for CORS
+      pub frontend_url: String,
++     /// JWT secret for authentication
++     #[allow(dead_code)]
+      pub jwt_secret: String,
+  }
+```
+
+---
+
+_****_
+
+
+
+
+
+These changes:
+1. Removed unused `ClientOptions` import from `db.rs`
+2. Removed unused `MongoError` import from `error.rs`
+3. Added documentation and silenced the dead code warning for `jwt_secret` field
+
+All the warnings should now be resolved. Note that the `jwt_secret` warning was just informational since we'll be using it later for JWT authentication. The other warnings were for unused imports that we've now cleaned up.
+
+---
+
+_**User**_
+
+@handlers.rs 
+
+Help make sure to validate the email and username in a way they are always lowercase on the backend, kind of citext in postgres. Whereby when user send a capital letter, its also same thing as small letter. And on the signup page on the frontend, maybe we always make the input for email and password lowercase too (pls backend is necessary) @user.rs  @+page.svelte 
+
+---
+
+_**Assistant**_
+
+I'll help you implement case-insensitive handling for email and username. Let's make the changes:
+
+1. First, let's update the User model to ensure emails and usernames are stored in lowercase:
+
+---
+
+_****_
+
+```diff
+          Self {
+              id: None,
+-             username,
++             username: username.to_lowercase(),
+              email: email.to_lowercase(),
+              password_hash,
+```
+
+---
+
+_****_
+
+
+
+2. Now let's update the signup handler to ensure case-insensitive comparisons:
+
+---
+
+_****_
+
+```diff
+      mut payload: web::Json<CreateUserDto>,
+  ) -> Result<HttpResponse, AppError> {
+-     // Sanitize input
++     // Sanitize input and convert to lowercase
++     payload.username = payload.username.to_lowercase();
++     payload.email = payload.email.to_lowercase();
+      payload.sanitize();
+  
+      let users_collection = db.get_users_collection();
+  
+-     // Check both username and email existence in a single query
++     // Check both username and email existence in a single query (case insensitive)
+      let existing_user = users_collection
+          .find_one(
+              doc! {
+                  "$or": [
+                      {
+-                         "username": {
+-                             "$regex": format!("^{}$", regex::escape(&payload.username)),
+-                             "$options": "i"
+-                         }
++                         "username": payload.username.to_lowercase()
+                      },
+                      {
+      // Check which field caused the conflict
+      if let Some(existing) = existing_user {
+-         if existing.email.to_lowercase() == payload.email.to_lowercase() {
++         if existing.email == payload.email {
++             // Both are already lowercase
+              return Err(AppError::Conflict(ErrorResponse {
+                  code: "EMAIL_EXISTS".to_string(),
+      let users_collection = db.get_users_collection();
+  
+-     // Trim whitespace from input
+-     let username_or_email = payload.username_or_email.trim();
++     // Trim whitespace and convert to lowercase
++     let username_or_email = payload.username_or_email.trim().to_lowercase();
+      let password = payload.password.trim();
+  
+              doc! {
+                  "$or": [
+-                     {
+-                         "username": {
+-                             "$regex": format!("^{}$", regex::escape(username_or_email)),
+-                             "$options": "i"
+-                         }
+-                     },
+-                     {
+-                         "email": username_or_email.to_lowercase()
+-                     }
++                     { "username": username_or_email },
++                     { "email": username_or_email }
+                  ]
+              },
+```
+
+---
+
+_****_
+
+
+
+
+
+3. Finally, let's update the signup page to convert email to lowercase on the frontend:
+
+---
+
+_****_
+
+```diff
+      fieldErrors = {};
+      loading = true;
++ 
++     // Convert email to lowercase before sending
++     const formData = {
++       username: username,
++       email: email.toLowerCase(),
++       password,
++       password_verify: confirmPassword,
++     };
+  
+      try {
+            "Content-Type": "application/json",
+          },
+-         body: JSON.stringify({
+-           username,
+-           email,
+-           password,
+-           password_verify: confirmPassword,
+-         }),
++         body: JSON.stringify(formData),
+          credentials: "include",
+        });
+            type="email"
+            bind:value={email}
++           on:input={(e) => (email = e.currentTarget.value.toLowerCase())}
+            placeholder="Your email"
+            class="w-full px-3 sm:px-4 py-2 bg-gray-700 border {fieldErrors.email
+```
+
+---
+
+_****_
+
+
+
+
+
+These changes ensure case-insensitive handling of email and username:
+
+1. Backend (User model):
+   - Stores username and email in lowercase
+   - Ensures consistent data storage
+
+2. Backend (Handlers):
+   - Converts username and email to lowercase before validation
+   - Uses direct lowercase comparisons instead of case-insensitive regex
+   - Handles login with case-insensitive matching
+
+3. Frontend:
+   - Converts email to lowercase as the user types
+   - Ensures lowercase email is sent to the backend
+   - Provides immediate visual feedback of lowercase conversion
+
+This approach provides:
+1. Consistent data storage (always lowercase)
+2. Case-insensitive matching (e.g., "User@example.com" matches "user@example.com")
+3. Better user experience (seeing lowercase conversion in real-time)
+4. Improved performance (direct string comparison vs regex)
+
+The backend enforces lowercase storage regardless of frontend behavior, ensuring data consistency even if the frontend validation is bypassed.
+
+---
+
+_**User**_
+
+Help fix this:
+
+[{
+	"resource": "/home/paulliano/Personal/gamie/backend/src/auth/handlers.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [2]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "2",
+			"fragment": "file:///home/paulliano/Personal/gamie/backend/src/auth/handlers.rs"
+		}
+	},
+	"severity": 8,
+	"message": "use of moved value: `username_or_email`\nvalue used here after move",
+	"source": "rustc",
+	"startLineNumber": 211,
+	"startColumn": 32,
+	"endLineNumber": 211,
+	"endColumn": 49,
+	"relatedInformation": [
+		{
+			"startLineNumber": 184,
+			"startColumn": 9,
+			"endLineNumber": 184,
+			"endColumn": 64,
+			"message": "`username_or_email` moved due to this method call",
+			"resource": "/home/paulliano/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bson-2.13.0/src/macros.rs"
+		},
+		{
+			"startLineNumber": 186,
+			"startColumn": 9,
+			"endLineNumber": 186,
+			"endColumn": 26,
+			"message": "move occurs because `username_or_email` has type `std::string::String`, which does not implement the `Copy` trait",
+			"resource": "/home/paulliano/Personal/gamie/backend/src/auth/handlers.rs"
+		},
+		{
+			"startLineNumber": 450,
+			"startColumn": 13,
+			"endLineNumber": 450,
+			"endColumn": 17,
+			"message": "`std::convert::Into::into` takes ownership of the receiver `self`, which moves `username_or_email`",
+			"resource": "/home/paulliano/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/convert/mod.rs"
+		},
+		{
+			"startLineNumber": 210,
+			"startColumn": 35,
+			"endLineNumber": 210,
+			"endColumn": 35,
+			"message": "consider borrowing `username_or_email`: `&`",
+			"resource": "/home/paulliano/Personal/gamie/backend/src/auth/handlers.rs"
+		},
+		{
+			"startLineNumber": 210,
+			"startColumn": 52,
+			"endLineNumber": 210,
+			"endColumn": 52,
+			"message": "you can `clone` the value and consume it, but this might not be your desired behavior: `.clone()`",
+			"resource": "/home/paulliano/Personal/gamie/backend/src/auth/handlers.rs"
+		}
+	],
+	"modelVersionId": 46
+},{
+	"resource": "/home/paulliano/Personal/gamie/backend/src/auth/handlers.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [0]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "0",
+			"fragment": "file:///home/paulliano/Personal/gamie/backend/src/auth/handlers.rs"
+		}
+	},
+	"severity": 4,
+	"message": "unused import: `regex`\n`#[warn(unused_imports)]` on by default",
+	"source": "rustc",
+	"startLineNumber": 7,
+	"startColumn": 5,
+	"endLineNumber": 7,
+	"endColumn": 10,
+	"relatedInformation": [
+		{
+			"startLineNumber": 7,
+			"startColumn": 1,
+			"endLineNumber": 8,
+			"endColumn": 1,
+			"message": "remove the whole `use` item",
+			"resource": "/home/paulliano/Personal/gamie/backend/src/auth/handlers.rs"
+		}
+	],
+	"tags": [
+		1
+	],
+	"modelVersionId": 46
+}]
+
+---
+
+_**Assistant**_
+
+I'll help fix these issues. There are two problems:
+
+1. A moved value error in the login handler where `username_or_email` is being used after it's moved
+2. An unused `regex` import
+
+Let me fix both issues:
+
+---
+
+_****_
+
+
+
+---
+
+_****_
+
 
 
 ---
