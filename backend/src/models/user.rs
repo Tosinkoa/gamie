@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use mongodb::bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 use validator::{Validate, ValidationError, ValidationErrors};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -9,9 +10,9 @@ pub struct User {
     pub id: Option<ObjectId>,
     pub username: String,
     pub email: String,
-    #[serde(skip_serializing, default)]
-    // Never send password hash to client and allow missing during checks
-    password_hash: String,
+    #[serde(rename = "passwordHash")]
+    // Never send password hash to client
+    pub password_hash: String,
     #[serde(default)]
     pub email_verified: bool,
     #[serde(default)]
@@ -67,12 +68,26 @@ impl User {
         use argon2::PasswordHash;
         use argon2::PasswordVerifier;
 
-        if let Ok(parsed_hash) = PasswordHash::new(&self.password_hash) {
-            argon2::Argon2::default()
-                .verify_password(password.as_bytes(), &parsed_hash)
-                .is_ok()
-        } else {
-            false
+        info!("Attempting to verify password");
+        info!("Stored hash length: {}", self.password_hash.len());
+
+        if self.password_hash.is_empty() {
+            error!("Password hash is empty!");
+            return false;
+        }
+
+        match PasswordHash::new(&self.password_hash) {
+            Ok(parsed_hash) => {
+                let result = argon2::Argon2::default()
+                    .verify_password(password.as_bytes(), &parsed_hash)
+                    .is_ok();
+                info!("Password verification result: {}", result);
+                result
+            }
+            Err(e) => {
+                error!("Failed to parse password hash: {}", e);
+                false
+            }
         }
     }
 

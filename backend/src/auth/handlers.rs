@@ -109,6 +109,8 @@ pub async fn signup(
         })?
         .to_string();
 
+    info!("Generated password hash during signup: {}", password_hash);
+
     // Create new user
     let user = User::new(
         payload.username.clone(),
@@ -116,18 +118,32 @@ pub async fn signup(
         password_hash,
     );
 
+    info!("User object before saving: {:?}", user);
+
     // Insert user into database
-    users_collection
+    let insert_result = users_collection
         .insert_one(&user, None)
         .await
         .map_err(|e| {
             error!("Database error during user creation: {}", e);
+            error!("Attempted to insert user: {:?}", user);
             AppError::DatabaseError(ErrorResponse {
                 code: "DATABASE_ERROR".to_string(),
-                message: "Error creating user account".to_string(),
+                message: format!("Error creating user account: {}", e),
                 field: None,
             })
         })?;
+
+    // Verify the user was saved correctly
+    if let Some(id) = insert_result.inserted_id.as_object_id() {
+        if let Ok(Some(saved_user)) = users_collection.find_one(doc! { "_id": id }, None).await {
+            info!(
+                "Saved user verification - Password hash exists: {}, length: {}",
+                !saved_user.password_hash.is_empty(),
+                saved_user.password_hash.len()
+            );
+        }
+    }
 
     info!("New user created: {}", user.username);
 
@@ -202,7 +218,7 @@ pub async fn login(
     }
 
     // Find user by username or email (case insensitive)
-    let mut user = users_collection
+    let user = users_collection
         .find_one(
             doc! {
                 "$or": [
@@ -220,14 +236,27 @@ pub async fn login(
                 message: e.to_string(),
                 field: None,
             })
-        })?
-        .ok_or_else(|| {
-            AppError::AuthError(ErrorResponse {
-                code: "INVALID_CREDENTIALS".to_string(),
-                message: "Invalid username/email or password".to_string(),
-                field: None,
-            })
         })?;
+
+    info!("Login attempt - Found user: {}", username_or_email);
+
+    if let Some(ref user) = user {
+        info!(
+            "User details - Username: {}, Email: {}, Has password: {}",
+            user.username,
+            user.email,
+            !user.password_hash.is_empty()
+        );
+    }
+
+    let mut user = user.ok_or_else(|| {
+        error!("No user found with username/email: {}", username_or_email);
+        AppError::AuthError(ErrorResponse {
+            code: "INVALID_CREDENTIALS".to_string(),
+            message: "Invalid username/email or password".to_string(),
+            field: None,
+        })
+    })?;
 
     // Check if account is locked
     if user.is_account_locked() {
