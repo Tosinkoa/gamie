@@ -2,13 +2,14 @@
   import Icon from "@iconify/svelte";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
+  import GameBoard from "./GameBoard.svelte";
 
   const gameId = $page.params.game;
   const roomId = $page.params.roomId;
 
   // Mock game state - replace with actual game logic and state management
   let gameState = {
-    status: "waiting",
+    status: "in_progress", // waiting, starting, in_progress, finished
     name: "Quick Sort Challenge",
     players: [
       {
@@ -35,16 +36,22 @@
       time: 60,
       range: "1-100",
     },
+    currentTurn: "Player1",
+    sequence: [],
+    availableNumbers: Array.from({ length: 24 }, (_, i) => i + 1).sort(
+      () => Math.random() - 0.5,
+    ), // Mock numbers, randomly shuffled
+    timeRemaining: 60,
   };
 
   let showSidebar = false;
   let isMicEnabled = false;
   let isSpeakerEnabled = false;
   let mounted = false;
+  let isReady = false;
 
   function toggleMic() {
     isMicEnabled = !isMicEnabled;
-    // TODO: Implement actual mic logic
   }
 
   function toggleSidebar() {
@@ -57,7 +64,11 @@
 
   function toggleSpeaker() {
     isSpeakerEnabled = !isSpeakerEnabled;
-    // TODO: Implement actual speaker logic
+  }
+
+  function toggleReady() {
+    isReady = !isReady;
+    // TODO: Send ready status to server
   }
 
   onMount(() => {
@@ -66,13 +77,15 @@
     // TODO: Initialize game state
     // TODO: Setup voice chat
   });
+
+  $: isCurrentTurn = gameState.currentTurn === "Player1"; // Replace with actual player ID check
 </script>
 
 <div
   class="game-page h-[100dvh] bg-gradient-to-br from-gray-800 to-black p-2 sm:p-6 overflow-hidden"
 >
   <div class="h-full max-w-7xl mx-auto flex flex-col">
-    <!-- Game Card - Single card for mobile -->
+    <!-- Game Card -->
     <div class="bg-gray-900 rounded-xl h-full flex flex-col overflow-hidden">
       <!-- Header Section -->
       <div class="p-3 sm:p-6 border-b border-gray-800 shrink-0">
@@ -165,10 +178,13 @@
             : 'hidden lg:block'} border-r border-gray-800"
         >
           {#if showSidebar}
-            <div
-              class="fixed inset-0 bg-black bg-opacity-50 lg:hidden"
+            <button
+              type="button"
+              class="fixed inset-0 bg-black bg-opacity-50 lg:hidden w-full h-full"
               on:click={toggleSidebar}
-            ></div>
+              on:keydown={(e) => e.key === "Enter" && toggleSidebar()}
+              aria-label="Close sidebar overlay"
+            ></button>
           {/if}
           <div
             class="bg-gray-900 h-full overflow-auto {showSidebar
@@ -225,24 +241,53 @@
         </div>
 
         <!-- Game Content -->
-        <div class="flex-1 p-4 flex items-center justify-center">
-          <div class="text-center max-w-md mx-auto">
-            <Icon
-              icon="ph:game-controller"
-              class="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-4"
+        <div class="flex-1 overflow-auto">
+          {#if gameState.status === "waiting"}
+            <div class="h-full flex items-center justify-center">
+              <div class="text-center max-w-md mx-auto p-4">
+                <Icon
+                  icon="ph:game-controller"
+                  class="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-4"
+                />
+                <h2 class="text-xl sm:text-2xl font-bold text-white mb-2">
+                  Game Starting Soon
+                </h2>
+                <p class="text-sm sm:text-base text-gray-400 mb-6">
+                  Waiting for all players to be ready...
+                </p>
+                <!-- Ready Button -->
+                <button
+                  on:click={toggleReady}
+                  class="px-6 py-3 {isReady
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-xl transition-colors duration-300 flex items-center mx-auto"
+                >
+                  <Icon icon="ph:check-circle" class="w-5 h-5 mr-2" />
+                  {isReady ? "Ready!" : "Ready to Play"}
+                </button>
+              </div>
+            </div>
+          {:else if gameState.status === "in_progress"}
+            <GameBoard
+              availableNumbers={gameState.availableNumbers}
+              {isCurrentTurn}
+              timeRemaining={gameState.timeRemaining}
+              players={[
+                {
+                  id: "1",
+                  username: "Player1",
+                  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Player1",
+                  score: 100,
+                },
+                {
+                  id: "2",
+                  username: "Player2",
+                  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Player2",
+                  score: 85,
+                },
+              ]}
             />
-            <h2 class="text-xl sm:text-2xl font-bold text-white mb-2">Game Starting Soon</h2>
-            <p class="text-sm sm:text-base text-gray-400 mb-6">
-              Waiting for all players to be ready...
-            </p>
-            <!-- Ready Button -->
-            <button
-              class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors duration-300 flex items-center mx-auto"
-            >
-              <Icon icon="ph:check-circle" class="w-5 h-5 mr-2" />
-              Ready to Play
-            </button>
-          </div>
+          {/if}
         </div>
       </div>
     </div>
@@ -251,6 +296,6 @@
 
 <style>
   :global(.game-page) {
-    @apply overflow-hidden;
+    overflow: hidden;
   }
 </style>

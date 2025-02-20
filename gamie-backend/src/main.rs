@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod db;
 mod error;
+mod game;
 mod models;
 mod user;
 
@@ -11,6 +12,7 @@ use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use dotenv::dotenv;
 use serde_json::json;
 use tracing::info;
+use std::env;
 
 use crate::{
     auth::routes::auth_routes,
@@ -18,6 +20,7 @@ use crate::{
     db::Database,
     error::{AppError, ErrorResponse},
     user::routes::user_routes,
+    game::game_routes,
 };
 
 async fn index() -> HttpResponse {
@@ -29,6 +32,11 @@ async fn index() -> HttpResponse {
                 "signup": "POST /auth/signup",
                 "login": "POST /auth/login",
                 "user": "GET /auth/user/{id}"
+            },
+            "game": {
+                "websocket": "WS /game/ws",
+                "create_room": "POST /game/rooms",
+                "get_room": "GET /game/rooms/{room_id}"
             }
         }
     }))
@@ -65,45 +73,33 @@ async fn main() -> std::io::Result<()> {
         .finish()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", config.host, config.port);
-    info!("Starting server at {}", server_url);
+    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let server_url = format!("{}:{}", host, port);
+    info!("Starting server at http://{}", server_url);
 
     let config_clone = config.clone();
     HttpServer::new(move || {
-        // Choose allowed origins based on environment
-        let env = std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string());
-        let cors = if env == "development" {
-            Cors::default()
-                .allowed_origin("http://localhost:5173")
-                .allowed_origin("http://127.0.0.1:5173")
-                .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-                .allowed_headers(vec!["Content-Type", "Authorization", "Cookie"])
-                .expose_headers(vec!["Set-Cookie"])
-                .supports_credentials()
-                .max_age(3600)
-        } else {
-            // Production: use your production frontend URL from your config
-            Cors::default()
-                .allowed_origin(&config_clone.frontend_url)
-                .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-                .allowed_headers(vec!["Content-Type", "Authorization", "Cookie"])
-                .expose_headers(vec!["Set-Cookie"])
-                .supports_credentials()
-                .max_age(3600)
-        };
-
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+            
         App::new()
-            .wrap(Logger::default())
             .wrap(cors)
+            .wrap(Logger::default())
+            .wrap(middleware::Compress::default())
             .wrap(Governor::new(&governor_conf))
             .app_data(web::Data::new(db.clone()))
             .app_data(web::Data::new(config_clone.clone()))
             .service(web::resource("/").to(index))
             .configure(auth_routes)
             .configure(user_routes)
+            .configure(game_routes)
             .default_service(web::route().to(not_found))
     })
-    .bind((config.host, config.port))?
+    .bind(server_url)?
     .run()
     .await
 }

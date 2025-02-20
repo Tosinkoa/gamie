@@ -1,0 +1,109 @@
+
+### 1. Overview
+
+Develop a scalable backend system for a multiplayer, turn-based number arrangement game. Players join a room, take turns placing numbers, and compete for the highest score. The backend handles room management, game initiation, turn-based moves with sequence validation, scoring, and post-game actions with real-time notifications.
+
+---
+
+### 2. Room Management & Settings
+
+- **Room Creation:**
+  - **Single Active Room:** Each user may only have one active room.
+  - **Room Configuration:** When creating a room, the creator sets a unique Room Name/ID.
+  
+- **Player Joining & Leaving:**
+  - **Joining:** Players can join open rooms. The player count is updated in real time.
+  - **Leaving:**
+    - **Pre-game:** Remove the player’s data immediately if the game hasn’t started.
+    - **During the Game:** Retain the player’s data for scoring and state management, allowing rejoining.
+
+- **Room Lifecycle Management:**
+  - **Auto-deletion:** Automatically delete the room when all players have left.
+  - **Rejoining Policy:** Once the game starts, no new players may join; only players who left mid-game are allowed to rejoin.
+
+---
+
+### 3. Game Start & Turn Management
+
+- **Game Initiation:**
+  - **Minimum Players:** A minimum of 2 players is required to start the game.
+  - **Activation Condition:** The “Start” button becomes active only when at least two players are present.
+  - **Countdown:** When the first player initiates the start, trigger a 3-second countdown before the game begins.
+  - **Locking the Room:** After the game starts, only existing (or reconnecting) players are permitted.
+
+- **Turn Management:**
+  - **Active Player:** Only the player whose turn it is can make a move.
+  - **Turn Timer:** Each turn lasts exactly 60 seconds.
+  - **First Player Role:** If the initial “first player” disconnects or leaves, transfer the role automatically to the next available player.
+
+---
+
+### 4. Number Sequence & Move Validation
+
+- **Sequence Generation & Security:**
+  - **Pre-stored Sequence:** Generate a complete, correct sequence of numbers upon room creation or game start. Securely store this sequence and keep it hidden from players to prevent cheating.
+
+- **Move Execution:**
+  - **Next Correct Number:** For each move, the backend sends:
+    - The next correct number from the stored sequence.
+    - A set of distractor numbers.
+  - **Validation:** Compare the player’s selection against the expected number.
+  - **Response:** Return a validation array (e.g., `[true, false, ...]`) indicating which positions are correctly arranged.
+
+---
+
+### 5. Game Completion & Scoring
+
+- **Game Termination:**
+  - **End Conditions:** The game ends when:
+    - All players have arranged their numbers, or
+    - Only one player remains.
+  - **Winner Determination:** Rank players based on their scores.
+
+- **Scoring System:**
+  - **Minimum Players:** Scoring and game progression apply only when at least 2 players are active.
+  - **Turn Time Considerations:**
+    - Each turn lasts exactly 60 seconds.
+    - **Time Bonus:** Award 1 bonus point for every second remaining on a turn (e.g., finishing in 45 seconds yields 15 bonus points).
+  - **Scoring Breakdown:**
+    - **Base Points:** 100 points for successfully completing the sequence during a turn.
+    - **Accuracy Bonus:** 10 additional points for every number placed correctly on the first attempt.
+    - **Timeout Penalty:** If the sequence isn’t completed within 60 seconds, the player receives 0 points for that turn.
+  - **Overall Game Duration:** The game session lasts exactly 15 minutes, providing a fixed window for all turns.
+
+- **Post-game Options:**
+  - **Player Choice:** After the game, players can choose to “Play Again” or “Leave.”
+  - **Auto-Queue:** If no choice is made within 6 seconds, players are automatically queued for the next match.
+  - **New Round Start:** The first player to click “Play Again” becomes the new “first player.” If all players opt to replay before the countdown ends, the game resets immediately with a fresh sequence while retaining the same room settings.
+
+---
+
+### 6. Shuffled Numbers Pool
+
+- **Pool Generation:**
+  - **Per Round:** Generate exactly 3 shuffled numbers for every empty box.
+  - **Balancing:** This ratio maintains the challenge without overwhelming players.
+
+---
+
+### 7. Additional Considerations
+
+- **Real-time Communication:**
+  - Utilize WebSocket or similar technologies to broadcast updates regarding:
+    - Room changes.
+    - Turn transitions.
+    - Score updates.
+    - Countdown timers.
+
+- **Error Handling & Data Integrity:**
+  - **Player Disconnections:** Update the game state in real time and transfer turns as needed.
+  - **Clear Error Messaging:** Provide concise, informative error messages for invalid moves or disconnections.
+  - **Data Security:** Ensure all game actions are reliably recorded, and the correct sequence is securely stored.
+
+- **Security & Scalability:**
+  - **Authentication:** Consider implementing user authentication for secure session management.
+  - **Caching & Persistence:** Use caching for quick game state access and a robust database for persistent data storage.
+  - **Modular Design:** Maintain clear separation between room management, game logic, and real-time communication to ease maintenance and scalability.
+  - **Logging & Monitoring:** Implement detailed logging and monitoring to aid in debugging and performance tuning.
+
+---
