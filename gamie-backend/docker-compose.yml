@@ -1,12 +1,12 @@
 services:
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./:/app
       - cargo_cache:/usr/local/cargo/registry
       - target_cache:/app/target
       - cargo_git_cache:/usr/local/cargo/git
@@ -28,6 +28,12 @@ services:
       - CARGO_BUILD_JOBS=4
       - CARGO_NET_GIT_FETCH_WITH_CLI=true
       - CARGO_HTTP_MULTIPLEXING=false
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=mongodb://mongodb:27017/gamie
+      - FRONTEND_URL=http://localhost:5173
+      - JWT_SECRET=your_development_secret_key
+      - RUST_ENV=development
 
   mongodb:
     image: mongo:latest

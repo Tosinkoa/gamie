@@ -23,7 +23,7 @@
 {#if !$userStore.user}
   {#if isLoading}
     <div
-      class="min-h-screen bg-gradient-to-br from-gray-800 to-black flex items-center justify-center"
+      class="h-[calc(100dvh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-800 to-black"
     >
       <div
         class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"
